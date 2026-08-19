@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Chess.com Move-Time Visualizer</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; padding: 16px; max-width: 1100px; margin: auto; color: #111; }
+    h1 { margin-top: 0; }
+    .controls { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+    input[type="text"] { padding:6px 8px; font-size:1rem; width:220px; }
+    button { padding:6px 10px; font-size:1rem; cursor:pointer; }
+    select { padding:6px; font-size:1rem; }
+    .layout { display:grid; grid-template-columns: 420px 1fr; gap:16px; align-items:start; }
+    .board-wrap { position:relative; width:400px; }
+    .board { width:100%; border-collapse:collapse; user-select: none; }
+    .board td { width:12.5%; height:50px; text-align:center; vertical-align:middle; font-size:30px; }
+    .light { background:#f0d9b5; }
+    .dark { background:#b58863; }
+    .svg-overlay { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; }
+    .info { margin-bottom:8px; font-size:0.95rem; }
+    .moves-list { max-height:420px; overflow:auto; border:1px solid #ddd; padding:8px; border-radius:6px; background:#fff; }
+    .move-row { display:flex; gap:8px; align-items:center; padding:6px; border-radius:6px; cursor:pointer; }
+    .move-row:hover { background:#f7f7f7; }
+    .move-number { width:32px; text-align:right; color:#555; }
+    .move-san { width:90px; }
+    .bar { height:18px; background:#2b9cff; border-radius:3px; display:inline-block; vertical-align:middle; }
+    .bar-empty { height:18px; background:#eee; border-radius:3px; display:inline-block; vertical-align:middle; width:40px; }
+    .move-time { min-width:56px; text-align:right; color:#222; font-variant-numeric:tabular-nums; margin-left:auto; }
+    .small { font-size:0.9rem; color:#555; }
+    .loading { color:#555; }
+    .error { color:#c00; }
+    footer { margin-top:18px; font-size:0.85rem; color:#666; }
+    @media (max-width:900px) { .layout { grid-template-columns: 1fr; } .board-wrap { width:100%; } .board td { height:44px; font-size:26px; } }
+  </style>
+</head>
+<body>
+  <h1>Chess.com Move-Time Visualizer</h1>
+  <div class="controls">
+    <label for="username">Chess.com username</label>
+    <input id="username" type="text" placeholder="e.g. magnuscarlsen" value="" />
+    <button id="loadGamesBtn">Load recent games</button>
+    <select id="gamesSelect"></select>
+    <span id="status" class="small"></span>
+  </div>
+
+  <div class="layout">
+    <div>
+      <div class="info" id="gameMeta">No game loaded.</div>
+      <div class="moves-list" id="movesList">Load a user and choose a game to see moves and durations.</div>
+    </div>
+
+    <div>
+      <div class="board-wrap">
+        <div id="boardTitle" class="small">Board (position before selected move)</div>
+        <table id="board" class="board" aria-label="Chessboard"></table>
+        <svg class="svg-overlay" id="svgOverlay" viewBox="0 0 400 400" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Notes: This reads public chess.com archives. Durations are computed from PGN clock annotations ([%clk H:MM:SS]) when present. If clocks are not present, move durations won't be available.
+  </footer>
+
+  <!-- chess.js from CDN (used to reconstruct positions and get 'from'/'to' squares) -->
+  <script src="https://cdn.jsdelivr.net/npm/chess.js@1.1.0/chess.min.js"></script>
+
+  <script>
+  // Helper utilities
+  function el(id){ return document.getElementById(id); }
+  function fmtSeconds(s){
+    if (s == null || isNaN(s)) return "-";
+    const sign = s < 0 ? "-" : "";
+    s = Math.abs(Math.round(s));
+    const hh = Math.floor(s / 3600);
+    const mm = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    return hh > 0 ? (sign + String(hh).padStart(2,'0') + ":" + String(mm).padStart(2,'0') + ":" + String(ss).padStart(2,'0')) :
+                     (sign + String(mm).padStart(1,'0') + ":" + String(ss).padStart(2,'0'));
+  }
+
+  // Parse clock "H:MM:SS" or "MM:SS" to seconds
+  function parseClockToSeconds(s){
+    if (!s) return null;
+    const parts = s.split(':').map(p=>parseInt(p,10));
+    if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
+    if (parts.length === 2) return parts[0]*60 + parts[1];
+    return parseInt(parts[0] || 0, 10);
+  }
+
+  // Extract tag value from PGN tags
+  function getPgnTag(pgn, tag){
+    const re = new RegExp('\\[' + tag + '\\s+"([^"]+)"\\]');
+    const m = pgn.match(re);
+    return m ? m[1] : null;
+  }
+
+  // Parse moves and clocks from PGN into an array of {moveNumber, white: {san, clk}, black: {san, clk}}
+  function parseMovesWithClocks(pgn){
+    // Split off tag block
+    const parts = pgn.split(/\r?\n\r?\n/);
+    const movesText = parts.slice(1).join("\n").trim();
+    if (!movesText) return [];
+
+    // Tokenize:
+    // - clock annotations like "{[%clk 0:05:00]}"
+    // - other comments "{...}"
+    // - move number tokens "1." or "1..."
+    // - SAN / result tokens (anything else not whitespace or braces)
+    const tokenRe = /\{\[%clk\s*([0-9:.]+)\]\}|\{[^}]*\}|\d+\.+|(?:[^\s\{\}]+)/g;
+    const tokens = movesText.match(tokenRe) || [];
+
+    const moves = [];
+    let currentMove = null;
+    let moveNumFromToken = null;
+    let expectColor = 'w'; // next SAN token is white by default
+
+    for (const token of tokens){
+      // move number like "1." or "1..."
+      if (/^\d+\.+$/.test(token)){
+        moveNumFromToken = parseInt(token, 10);
+        // keep expectColor as 'w' (we will rely on SAN ordering)
+        expectColor = 'w';
+        continue;
+      }
+
+      // clock annotation like "{[%clk 0:05:00]}"
+      const clkMatch = token.match(/^\{\[%clk\s*([0-9:.]+)\]\}$/);
+      if (clkMatch){
+        const clkStr = clkMatch[1];
+        const clkSec = parseClockToSeconds(clkStr);
+        // Attach to the last half-move. If expectColor==='b', last pushed SAN was white; attach to that white.
+        // If expectColor==='w', the last pushed SAN was black; attach to that black.
+        if (expectColor === 'b'){
+          const last = moves[moves.length - 1];
+          if (last && last.white) last.white.clk = clkSec;
+        } else {
+          const last = moves[moves.length - 1];
+          if (last && last.black) last.black.clk = clkSec;
+        }
+        continue;
+      }
+
+      // other comments "{...}" - ignore
+      if (/^\{.*\}$/.test(token)) continue;
+
+      // game result token -> stop
+      if (/^(1-0|0-1|1\/2-1\/2|\*)$/.test(token)) break;
+
+      // Otherwise it's a SAN token (move)
+      if (expectColor === 'w'){
+        const mnum = moveNumFromToken || (moves.length + 1);
+        currentMove = { moveNumber: mnum, white: { san: token, clk: null }, black: null };
+        moves.push(currentMove);
+        expectColor = 'b';
+      } else {
+        // black move for current move
+        if (!currentMove){
+          const mnum = moveNumFromToken || (moves.length + 1);
+          currentMove = { moveNumber: mnum, white: { san: null, clk: null }, black: null };
+          moves.push(currentMove);
+        }
+        currentMove.black = { san: token, clk: null };
+        // done with this move
+        expectColor = 'w';
+        currentMove = null;
+        // once we've consumed a black move, clear moveNumFromToken so future move numbers are inferred
+        moveNumFromToken = null;
+      }
+    }
+
+    return moves;
+  }
+
+  // Compute per-move durations (in seconds) from parsed move list and initialTime (seconds) if available.
+  // Returns flattened array of moves in order (index starting 0) with {index, ply, color, san, clkAfter, duration}
+  function computeDurations(parsedMoves, initialTime){
+    const result = [];
+    // Keep previous clock by color
+    let prevClock = { w: initialTime == null ? null : initialTime, b: initialTime == null ? null : initialTime };
+    let plyIndex = 0;
+    for (const mv of parsedMoves){
+      // White
+      const w = mv.white;
+      if (w && w.san){
+        const after = w.clk;
+        let dur = null;
+        if (after != null && prevClock.w != null) dur = prevClock.w - after;
+        // update prevClock.w to after if present
+        if (after != null) prevClock.w = after;
+        result.push({ index: plyIndex, ply: plyIndex+1, color: 'w', san: w.san, clkAfter: after, duration: dur });
+        plyIndex++;
+      }
+      // Black
+      const b = mv.black;
+      if (b && b.san){
+        const after = b.clk;
+        let dur = null;
+        if (after != null && prevClock.b != null) dur = prevClock.b - after;
+        if (after != null) prevClock.b = after;
+        result.push({ index: plyIndex, ply: plyIndex+1, color: 'b', san: b.san, clkAfter: after, duration: dur });
+        plyIndex++;
+      }
+    }
+    return result;
+  }
+
+  // Render moves list and durations
+  function renderMovesList(flatMoves){
+    const container = el('movesList');
+    container.innerHTML = '';
+    if (!flatMoves || flatMoves.length === 0){
+      container.textContent = 'No move data found.';
+      return;
+    }
+    // find max duration for bar scaling
+    const maxDur = flatMoves.reduce((m, x) => (x.duration != null && x.duration > m) ? x.duration : m, 0);
+    flatMoves.forEach((mv, idx) => {
+      const row = document.createElement('div');
+      row.className = 'move-row';
+      row.dataset.plyIndex = mv.index;
+      const num = document.createElement('div'); num.className = 'move-number small'; num.textContent = mv.ply + (mv.color==='w'?'w':'b');
+      const san = document.createElement('div'); san.className = 'move-san'; san.textContent = mv.san;
+      const barWrap = document.createElement('div');
+      if (mv.duration == null || isNaN(mv.duration)){
+        const emptyBar = document.createElement('div'); emptyBar.className='bar-empty'; barWrap.appendChild(emptyBar);
+      } else {
+        const widthPct = maxDur > 0 ? Math.max(6, Math.round(mv.duration / maxDur * 260)) : 40;
+        const bar = document.createElement('div'); bar.className='bar'; bar.style.width = widthPct + 'px';
+        barWrap.appendChild(bar);
+      }
+      const t = document.createElement('div'); t.className='move-time small'; t.textContent = mv.duration == null ? '-' : fmtSeconds(mv.duration);
+      row.appendChild(num); row.appendChild(san); row.appendChild(barWrap); row.appendChild(t);
+      row.addEventListener('click', ()=> onMoveClick(mv.index));
+      container.appendChild(row);
+    });
+  }
+
+  // Board rendering using chess.js board()
+  const boardEl = el('board');
+  const svg = el('svgOverlay');
+
+  function drawBoard(chessInstance){
+    // chessInstance.board() returns 8x8 array with null or {type,color}
+    const board = chessInstance.board();
+    boardEl.innerHTML = '';
+    const size = boardEl.clientWidth; // container width
+    // make table rows
+    for (let rank=8; rank>=1; rank--){
+      const tr = document.createElement('tr');
+      for (let file=1; file<=8; file++){
+        const td = document.createElement('td');
+        const isLight = ((file + rank) % 2 === 0);
+        td.className = isLight ? 'light' : 'dark';
+        const piece = board[8-rank][file-1];
+        if (piece){
+          td.textContent = pieceToUnicode(piece);
+        } else td.textContent = '';
+        td.dataset.square = fileRankToSquare(file, rank);
+        tr.appendChild(td);
+      }
+      boardEl.appendChild(tr);
+    }
+    // adjust svg viewBox to board size for arrow drawing
+    const rect = boardEl.getBoundingClientRect();
+    svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+    svg.style.width = rect.width + 'px';
+    svg.style.height = rect.height + 'px';
+  }
+
+  // Map piece object from chess.js to unicode glyph
+  function pieceToUnicode(piece){
+    const map = {
+      'p': { w: '♙', b: '♟' },
+      'r': { w: '♖', b: '♜' },
+      'n': { w: '♘', b: '♞' },
+      'b': { w: '♗', b: '♝' },
+      'q': { w: '♕', b: '♛' },
+      'k': { w: '♔', b: '♚' }
+    };
+    return map[piece.type] ? map[piece.type][piece.color] : '';
+  }
+
+  function fileRankToSquare(file, rank){ // file=1..8 => a..h
+    return String.fromCharCode(96 + file) + rank;
+  }
+
+  // Return center of square in SVG coordinates
+  function squareCenter(square){
+    // find corresponding td element
+    const td = boardEl.querySelector('td[data-square="'+square+'"]');
+    if (!td) return null;
+    const rect = boardEl.getBoundingClientRect();
+    const tdRect = td.getBoundingClientRect();
+    const x = tdRect.left - rect.left + tdRect.width/2;
+    const y = tdRect.top - rect.top + tdRect.height/2;
+    return {x, y};
+  }
+
+  // Draw arrow from squareFrom to squareTo (in board coordinates)
+  function drawArrow(fromSquare, toSquare){
+    svg.innerHTML = '';
+    const c1 = squareCenter(fromSquare);
+    const c2 = squareCenter(toSquare);
+    if (!c1 || !c2) return;
+    // create line with arrowhead
+    const ns = "http://www.w3.org/2000/svg";
+    const defs = document.createElementNS(ns,'defs');
+    defs.innerHTML = '<marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,4 L0,8 z" fill="#ff2b2b"/></marker>';
+    svg.appendChild(defs);
+    const line = document.createElementNS(ns,'line');
+    line.setAttribute('x1', c1.x); line.setAttribute('y1', c1.y);
+    line.setAttribute('x2', c2.x); line.setAttribute('y2', c2.y);
+    line.setAttribute('stroke', '#ff2b2b'); line.setAttribute('stroke-width', '4'); line.setAttribute('stroke-linecap','round');
+    line.setAttribute('marker-end','url(#arrowhead)');
+    svg.appendChild(line);
+    // optionally emphasize source square (circle)
+    const circ = document.createElementNS(ns,'circle');
+    circ.setAttribute('cx', c1.x); circ.setAttribute('cy', c1.y);
+    circ.setAttribute('r', 8); circ.setAttribute('fill', 'rgba(255,43,43,0.15)'); circ.setAttribute('stroke','none');
+    svg.appendChild(circ);
+  }
+
+  // Globals for current game
+  let currentGame = null; // full game JSON from archives
+  let flatMoves = []; // computed moves with durations
+  let moveSanList = []; // SAN list for chess.js moves
+  let initialTimeSeconds = null;
+
+  async function loadArchivesForUser(username){
+    el('status').textContent = 'Loading archives...';
+    try{
+      const url = `https://api.chess.com/pub/player/${encodeURIComponent(username)}/games/archives`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Could not fetch archives: ' + res.status);
+      const data = await res.json();
+      // archives is array of URLs; choose latest (last)
+      const archives = data.archives;
+      if (!archives || archives.length === 0) throw new Error('No archives found for user.');
+      // fetch most recent archive only
+      const last = archives[archives.length - 1];
+      el('status').textContent = 'Loading latest archive...';
+      const res2 = await fetch(last);
+      if (!res2.ok) throw new Error('Could not fetch latest archive: ' + res2.status);
+      const monthData = await res2.json();
+      const games = monthData.games || [];
+      // Populate select with recent games (limit 50)
+      const select = el('gamesSelect');
+      select.innerHTML = '';
+      games.slice(0, 80).forEach((g, i) => {
+        const opt = document.createElement('option');
+        const white = g.white && g.white.username ? g.white.username : (g.white ? g.white : 'white');
+        const black = g.black && g.black.username ? g.black.username : (g.black ? g.black : 'black');
+        const when = g.end_time ? new Date(g.end_time * 1000).toLocaleString() : '';
+        opt.value = i;
+        opt.textContent = `${i+1}. ${white} vs ${black} ${when} ${g.url ? '' : ''}`;
+        opt.dataset.gameIndex = i;
+        select.appendChild(opt);
+      });
+      el('status').textContent = 'Loaded ' + games.length + ' games from latest archive.';
+      // store month games list in currentGamesList for selection usage
+      currentGameList = games;
+      // auto-select first if present
+      if (games.length>0){
+        select.selectedIndex = 0;
+        await onGameSelectChange();
+      }
+    } catch(err){
+      el('status').textContent = '';
+      el('movesList').textContent = 'Error: ' + err.message;
+    }
+  }
+
+  let currentGameList = [];
+
+  async function onGameSelectChange(){
+    const select = el('gamesSelect');
+    const idx = select.selectedIndex;
+    if (idx < 0) return;
+    const game = currentGameList[idx];
+    if (!game) return;
+    currentGame = game;
+    // Show metadata
+    const white = game.white && game.white.username ? game.white.username : 'white';
+    const black = game.black && game.black.username ? game.black.username : 'black';
+    const when = game.end_time ? new Date(game.end_time * 1000).toLocaleString() : '';
+    el('gameMeta').textContent = `${white} vs ${black} — ${when} — ${game.time_class || ''} ${game.time_control ? ('  time_control:' + game.time_control) : ''}`;
+    // parse PGN
+    const pgn = game.pgn || '';
+    const parsedMoves = parseMovesWithClocks(pgn);
+    // initial time try to detect from TimeControl in PGN or game.time_control
+    let timeControl = getPgnTag(pgn,'TimeControl') || game.time_control || null;
+    if (timeControl && timeControl.indexOf('+')>-1) timeControl = timeControl.split('+')[0];
+    const initial = timeControl ? parseInt(timeControl,10) : null;
+    initialTimeSeconds = Number.isFinite(initial) ? initial : null;
+    // compute flat moves
+    flatMoves = computeDurations(parsedMoves, initialTimeSeconds);
+    // Build move SAN list (flatten SANs in order) to feed chess.js
+    moveSanList = [];
+    parsedMoves.forEach(m=>{
+      if (m.white && m.white.san) moveSanList.push(m.white.san);
+      if (m.black && m.black.san) moveSanList.push(m.black.san);
+    });
+    // Render move list
+    renderMovesList(flatMoves);
+    // Initialize chess.js and show starting full board (before move 0)
+    const chess = new Chess();
+    // reset with starting FEN if present
+    const fen = getPgnTag(pgn,'FEN');
+    if (fen) chess.load(fen);
+    drawBoard(chess);
+    svg.innerHTML = '';
+    el('status').textContent = 'Game loaded. Click a move to view its starting position and arrow.';
+  }
+
+  // When user clicks a move from the list
+  function onMoveClick(plyIndex){
+    if (!currentGame) return;
+    // build chess instance and apply moves up to the plyIndex (but not the selected move)
+    const chess = new Chess();
+    // start FEN if present
+    const pgn = currentGame.pgn || '';
+    const fen = getPgnTag(pgn,'FEN');
+    if (fen) chess.load(fen);
+    // apply moves up to plyIndex (we want position before move at plyIndex)
+    for (let i=0;i<plyIndex;i++){
+      const san = moveSanList[i];
+      if (!san) break;
+      const m = chess.move(san, { sloppy: true });
+      if (!m) {
+        // couldn't apply SAN? attempt sloppy fallback
+        // try removing annotations like +, #, ?!
+        const clean = san.replace(/[+#?!]+/g,'');
+        chess.move(clean, { sloppy:true });
+      }
+    }
+    // now the next move to apply is moveSanList[plyIndex]
+    const nextSan = moveSanList[plyIndex];
+    let moveObj = null;
+    if (nextSan){
+      moveObj = chess.move(nextSan, { sloppy: true });
+      // moveObj is the move that was just made; but we want the position before that move (starting position)
+      // So undo it to go back to starting position
+      if (moveObj) chess.undo();
+    }
+    // draw position before move
+    drawBoard(chess);
+    // draw arrow if we have moveObj or can compute move from sloppy attempt
+    if (!moveObj && nextSan){
+      // try to compute legal moves that match SAN
+      try {
+        moveObj = chess.move(nextSan, { sloppy: true });
+        if (moveObj) chess.undo();
+      } catch(e){}
+    }
+    if (moveObj){
+      drawArrow(moveObj.from, moveObj.to);
+    } else {
+      svg.innerHTML = '';
+    }
+  }
+
+  // Wire up UI
+  el('loadGamesBtn').addEventListener('click', ()=>{
+    const username = el('username').value.trim();
+    if (!username){ alert('Enter a chess.com username'); return; }
+    loadArchivesForUser(username);
+  });
+  el('gamesSelect').addEventListener('change', onGameSelectChange);
+
+  // Allow pressing enter on username
+  el('username').addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter') el('loadGamesBtn').click();
+  });
+
+  // On load, focus username
+  (function(){ el('username').focus(); })();
+
+  </script>
+</body>
+</html>
