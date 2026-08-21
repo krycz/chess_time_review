@@ -7,18 +7,17 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <h1>Chess.com Move-Time Visualizer</h1>
-  <div class="controls-stack">
-    <div class="controls-row">
-      <label for="username">Chess.com username</label>
-      <div class="controls-input-group">
-        <input id="username" type="text" placeholder="e.g. magnuscarlsen" value="" />
-        <button id="loadGamesBtn">Load recent games</button>
-      </div>
-      <span id="status" class="small"></span>
+  <div class="title-row">
+    <h1>Chess.com Move-Time Visualizer</h1>
+    <div class="controls-input-group title-row-controls">
+      <input id="username" type="text" placeholder="chess.com username" value="" />
+      <button id="loadGamesBtn"><span class="btn-full">Load recent games</span><span class="btn-short">Load</span></button>
     </div>
-    <div class="controls-row">
-      <label for="gamesSelect">Select game</label>
+  </div>
+  <div class="controls-stack">
+    <span id="status" class="small"></span>
+    <div class="controls-row game-select-row">
+      <label for="gamesSelect" class="game-select-label">Game:</label>
       <select id="gamesSelect">
         <option value="">Load a user first</option>
       </select>
