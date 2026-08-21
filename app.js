@@ -162,6 +162,12 @@ async function loadArchivesForUser(username) {
     el("movesList").textContent = "Error: " + err.message;
     el("gameMeta").textContent = "No game loaded.";
     updateMoveNavigation();
+    if (typeof Chess !== "undefined") {
+      drawInitialBoard();
+    } else {
+      el("board").innerHTML = "";
+      svg.innerHTML = "";
+    }
   }
 }
 
