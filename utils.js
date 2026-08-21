@@ -239,27 +239,26 @@ function computeDurations(parsedMoves, initialTime, increment) {
   return result;
 }
 
-// Map a move duration to a pixel width for the timeline bar.
-// Uses logarithmic compression so very long moves do not dominate layout while
-// preserving monotonic growth with duration.
-function durationToBarWidth(duration, maxDuration, opts) {
+// Map a move duration to a percentage width for the timeline bar.
+// Width is normalized against the maximum duration in the current move list.
+function durationToBarPercent(duration, maxDuration, opts) {
   const options = opts || {};
-  const minWidth = Number.isFinite(options.minWidth) ? options.minWidth : 6;
-  const maxWidth = Number.isFinite(options.maxWidth) ? options.maxWidth : 260;
-  const fallbackWidth = Number.isFinite(options.fallbackWidth) ? options.fallbackWidth : 40;
-  const startWidth = Math.min(minWidth, maxWidth);
-  const endWidth = Math.max(minWidth, maxWidth);
+  const minPercent = Number.isFinite(options.minPercent) ? options.minPercent : 2;
+  const maxPercent = Number.isFinite(options.maxPercent) ? options.maxPercent : 100;
+  const fallbackPercent = Number.isFinite(options.fallbackPercent) ? options.fallbackPercent : 15;
+  const startPercent = Math.min(minPercent, maxPercent);
+  const endPercent = Math.max(minPercent, maxPercent);
 
-if (!Number.isFinite(duration)) return fallbackWidth;
+  if (!Number.isFinite(duration)) return fallbackPercent;
 
   const safeDuration = Math.max(0, duration);
   const safeMax = Number.isFinite(maxDuration) ? Math.max(0, maxDuration) : 0;
-  if (safeMax <= 0) return fallbackWidth;
-  if (endWidth === startWidth) return startWidth;
+  if (safeMax <= 0) return fallbackPercent;
+  if (endPercent === startPercent) return startPercent;
 
-  const ratio = Math.log1p(safeDuration) / Math.log1p(safeMax);
+  const ratio = safeDuration / safeMax;
   const clampedRatio = Math.min(1, Math.max(0, ratio));
-  return Math.round(startWidth + clampedRatio * (endWidth - startWidth));
+  return startPercent + clampedRatio * (endPercent - startPercent);
 }
 
 if (typeof module !== "undefined" && module.exports) {
@@ -272,6 +271,6 @@ if (typeof module !== "undefined" && module.exports) {
     getGameTypeLabel,
     parseMovesWithClocks,
     computeDurations,
-    durationToBarWidth,
+    durationToBarPercent,
   };
 }
