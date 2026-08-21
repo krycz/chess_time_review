@@ -100,11 +100,11 @@ function parseMovesWithClocks(pgn) {
   let expectColor = "w"; // next SAN token is white by default
 
   for (const token of tokens) {
-    // move number like "1." or "1..."
+    // move number like "1." (white) or "1..." (black's turn)
     if (/^\d+\.+$/.test(token)) {
       moveNumFromToken = parseInt(token, 10);
-      // keep expectColor as 'w' (we will rely on SAN ordering)
-      expectColor = "w";
+      // "1..." means black to move next; "1." means white to move next
+      expectColor = token.indexOf("...") > -1 ? "b" : "w";
       continue;
     }
 
@@ -182,6 +182,9 @@ function computeDurations(parsedMoves, initialTime, increment) {
       let dur = null;
       if (after != null && prevClock.w != null) {
         dur = prevClock.w + inc - after;
+        if (dur < -5) {
+          console.warn(`computeDurations: large negative white duration (${dur}s) at move ${mv.moveNumber} — possible clock-attachment bug`);
+        }
         if (dur < 0) dur = 0;
       }
       // update prevClock.w to after if present
@@ -196,6 +199,9 @@ function computeDurations(parsedMoves, initialTime, increment) {
       let dur = null;
       if (after != null && prevClock.b != null) {
         dur = prevClock.b + inc - after;
+        if (dur < -5) {
+          console.warn(`computeDurations: large negative black duration (${dur}s) at move ${mv.moveNumber} — possible clock-attachment bug`);
+        }
         if (dur < 0) dur = 0;
       }
       if (after != null) prevClock.b = after;
@@ -204,4 +210,9 @@ function computeDurations(parsedMoves, initialTime, increment) {
     }
   }
   return result;
+}
+
+// Export for Node.js / Jest environments
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { fmtSeconds, parseClockToSeconds, parseTimeControl, getPgnTag, parseMovesWithClocks, computeDurations };
 }
