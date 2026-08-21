@@ -67,7 +67,10 @@ async function loadArchivesForUser(username) {
     const res2 = await fetch(last);
     if (!res2.ok) throw new Error("Could not fetch latest archive: " + res2.status);
     const monthData = await res2.json();
-    const games = monthData.games || [];
+    let games = monthData.games || [];
+    // Show most recent games first (chess.com archives are returned in
+    // chronological order, oldest first)
+    games = games.slice().sort((a, b) => (b.end_time || 0) - (a.end_time || 0));
     // Populate select with recent games (limit 80)
     const select = el("gamesSelect");
     select.innerHTML = "";
@@ -76,8 +79,9 @@ async function loadArchivesForUser(username) {
       const white = g.white && g.white.username ? g.white.username : g.white ? g.white : "white";
       const black = g.black && g.black.username ? g.black.username : g.black ? g.black : "black";
       const when = g.end_time ? new Date(g.end_time * 1000).toLocaleString() : "";
+      const typeLabel = getGameTypeLabel(g);
       opt.value = i;
-      opt.textContent = `${i + 1}. ${white} vs ${black} ${when} ${g.url ? "" : ""}`;
+      opt.textContent = `${when} — ${typeLabel} — ${white} vs ${black}`;
       opt.dataset.gameIndex = i;
       select.appendChild(opt);
     });
@@ -106,9 +110,10 @@ async function onGameSelectChange() {
   const white = game.white && game.white.username ? game.white.username : "white";
   const black = game.black && game.black.username ? game.black.username : "black";
   const when = game.end_time ? new Date(game.end_time * 1000).toLocaleString() : "";
+  const typeLabel = getGameTypeLabel(game);
   el(
     "gameMeta"
-  ).textContent = `${white} vs ${black} — ${when} — ${game.time_class || ""} ${game.time_control ? "  time_control:" + game.time_control : ""}`;
+  ).textContent = `${white} vs ${black} — ${when} — ${typeLabel}`;
   // parse PGN
   const pgn = game.pgn || "";
   const parsedMoves = parseMovesWithClocks(pgn);

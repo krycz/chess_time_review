@@ -79,6 +79,39 @@ function getPgnTag(pgn, tag) {
   return m ? m[1] : null;
 }
 
+// Build a short, human-friendly label (with emoji) describing a game's time class
+// and time control, e.g. "⚡ Blitz 5+0", "⏱️ Rapid 15+10", "📅 Daily 3d/move", "🚀 Bullet 1+0".
+// This lets users distinguish games that share a time_class (e.g. chess.com groups
+// both 10+0 and 15+10 as "rapid") but have quite different pacing.
+function getGameTypeLabel(game) {
+  const timeClass = (game && game.time_class) || "";
+  const tc = (game && game.time_control) || "";
+  const emojiMap = {
+    bullet: "🚀",
+    blitz: "⚡",
+    rapid: "⏱️",
+    daily: "📅",
+  };
+  const emoji = emojiMap[timeClass] || "♟️";
+  let label = timeClass ? timeClass.charAt(0).toUpperCase() + timeClass.slice(1) : "Game";
+
+  if (!tc) return `${emoji} ${label}`;
+
+  const { initial, increment } = parseTimeControl(tc);
+  if (initial == null) return `${emoji} ${label}`;
+
+  if (timeClass === "daily") {
+    const days = initial / 86400;
+    const daysStr = Number.isInteger(days) ? days : days.toFixed(1);
+    label += ` ${daysStr}d/move`;
+  } else {
+    const minutes = initial / 60;
+    const minStr = Number.isInteger(minutes) ? minutes : minutes.toFixed(1);
+    label += ` ${minStr}+${increment}`;
+  }
+  return `${emoji} ${label}`;
+}
+
 // Parse moves and clocks from PGN into an array of {moveNumber, white: {san, clk}, black: {san, clk}}
 function parseMovesWithClocks(pgn) {
   // Split off tag block
@@ -182,9 +215,6 @@ function computeDurations(parsedMoves, initialTime, increment) {
       let dur = null;
       if (after != null && prevClock.w != null) {
         dur = prevClock.w + inc - after;
-        if (dur < -5) {
-          console.warn(`computeDurations: large negative white duration (${dur}s) at move ${mv.moveNumber} — possible clock-attachment bug`);
-        }
         if (dur < 0) dur = 0;
       }
       // update prevClock.w to after if present
@@ -199,9 +229,6 @@ function computeDurations(parsedMoves, initialTime, increment) {
       let dur = null;
       if (after != null && prevClock.b != null) {
         dur = prevClock.b + inc - after;
-        if (dur < -5) {
-          console.warn(`computeDurations: large negative black duration (${dur}s) at move ${mv.moveNumber} — possible clock-attachment bug`);
-        }
         if (dur < 0) dur = 0;
       }
       if (after != null) prevClock.b = after;
@@ -210,9 +237,4 @@ function computeDurations(parsedMoves, initialTime, increment) {
     }
   }
   return result;
-}
-
-// Export for Node.js / Jest environments
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = { fmtSeconds, parseClockToSeconds, parseTimeControl, getPgnTag, parseMovesWithClocks, computeDurations };
 }
