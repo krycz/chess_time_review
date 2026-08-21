@@ -238,3 +238,16 @@ function computeDurations(parsedMoves, initialTime, increment) {
   }
   return result;
 }
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    el,
+    fmtSeconds,
+    parseClockToSeconds,
+    parseTimeControl,
+    getPgnTag,
+    getGameTypeLabel,
+    parseMovesWithClocks,
+    computeDurations,
+  };
+}
