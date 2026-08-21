@@ -48,7 +48,15 @@ function renderMovesList(flatMoves) {
     row.appendChild(san);
     row.appendChild(barWrap);
     row.appendChild(t);
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
     row.addEventListener("click", () => setSelectedMoveIndex(idx));
+    row.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        setSelectedMoveIndex(idx);
+      }
+    });
     container.appendChild(row);
   });
 }
