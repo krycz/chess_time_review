@@ -65,6 +65,12 @@ select {
   min-width: 0;
 }
 
+.board-panel {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
 .board-wrap {
   position: relative;
   width: 100%;
@@ -269,6 +275,7 @@ footer {
   }
 
   .board-panel {
+    margin: 0;
     justify-self: end;
   }
 }

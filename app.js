@@ -114,6 +114,12 @@ async function loadArchivesForUser(username) {
     // Populate select with recent games (limit 80)
     const select = el("gamesSelect");
     select.innerHTML = "";
+    if (games.length === 0) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No games found in latest archive";
+      select.appendChild(opt);
+    }
     games.slice(0, 80).forEach((g, i) => {
       const opt = document.createElement("option");
       const white = g.white && g.white.username ? g.white.username : g.white ? g.white : "white";
@@ -132,10 +138,25 @@ async function loadArchivesForUser(username) {
     if (games.length > 0) {
       select.selectedIndex = 0;
       await onGameSelectChange();
+    } else {
+      currentGame = null;
+      flatMoves = [];
+      moveSanList = [];
+      selectedMoveIndex = -1;
+      renderMovesList(flatMoves);
+      updateMoveNavigation();
+      el("gameMeta").textContent = "No game loaded.";
+      svg.innerHTML = "";
     }
   } catch (err) {
+    currentGame = null;
+    flatMoves = [];
+    moveSanList = [];
+    selectedMoveIndex = -1;
     el("status").textContent = "";
     el("movesList").textContent = "Error: " + err.message;
+    el("gameMeta").textContent = "No game loaded.";
+    updateMoveNavigation();
   }
 }
 
@@ -263,6 +284,7 @@ function updateUsernameInUrl(username) {
 
 // On load, prefill username from URL (if present) and auto-load games; otherwise focus the field
 (function () {
+  updateMoveNavigation();
   const usernameFromUrl = getUsernameFromUrl();
   if (usernameFromUrl) {
     el("username").value = usernameFromUrl;
