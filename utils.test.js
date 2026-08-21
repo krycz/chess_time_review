@@ -4,7 +4,7 @@ const {
   parseTimeControl,
   parseMovesWithClocks,
   computeDurations,
-  durationToBarWidth,
+  durationToBarPercent,
   fmtSeconds,
 } = require("./utils.js");
 
@@ -225,34 +225,34 @@ describe("Regression: 900+10 rapid game with increment", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // durationToBarWidth
+  // durationToBarPercent
   // ---------------------------------------------------------------------------
-  describe("durationToBarWidth", () => {
-    test("returns fallback width for null/invalid durations", () => {
-      expect(durationToBarWidth(null, 100)).toBe(40);
-      expect(durationToBarWidth(NaN, 100)).toBe(40);
-      expect(durationToBarWidth(5, 0)).toBe(40);
-      expect(durationToBarWidth(5, NaN)).toBe(40);
-      expect(durationToBarWidth(5, -10)).toBe(40);
+  describe("durationToBarPercent", () => {
+    test("returns fallback percent for null/invalid durations", () => {
+      expect(durationToBarPercent(null, 100)).toBe(15);
+      expect(durationToBarPercent(NaN, 100)).toBe(15);
+      expect(durationToBarPercent(5, 0)).toBe(15);
+      expect(durationToBarPercent(5, NaN)).toBe(15);
+      expect(durationToBarPercent(5, -10)).toBe(15);
     });
 
     test("is monotonic with duration", () => {
       const max = 600;
-      const w1 = durationToBarWidth(5, max);
-      const w2 = durationToBarWidth(30, max);
-      const w3 = durationToBarWidth(120, max);
-      const w4 = durationToBarWidth(600, max);
+      const w1 = durationToBarPercent(5, max);
+      const w2 = durationToBarPercent(30, max);
+      const w3 = durationToBarPercent(120, max);
+      const w4 = durationToBarPercent(600, max);
       expect(w1).toBeLessThanOrEqual(w2);
       expect(w2).toBeLessThanOrEqual(w3);
       expect(w3).toBeLessThanOrEqual(w4);
     });
 
-    test("respects configured min and max width bounds", () => {
-      const minWidth = 8;
-      const maxWidth = 180;
-      expect(durationToBarWidth(0, 300, { minWidth, maxWidth })).toBe(minWidth);
-      expect(durationToBarWidth(300, 300, { minWidth, maxWidth })).toBe(maxWidth);
-      expect(durationToBarWidth(600, 300, { minWidth, maxWidth })).toBe(maxWidth);
+    test("respects configured min and max percent bounds", () => {
+      const minPercent = 8;
+      const maxPercent = 100;
+      expect(durationToBarPercent(0, 300, { minPercent, maxPercent })).toBe(minPercent);
+      expect(durationToBarPercent(300, 300, { minPercent, maxPercent })).toBe(maxPercent);
+      expect(durationToBarPercent(600, 300, { minPercent, maxPercent })).toBe(maxPercent);
     });
   });
 });

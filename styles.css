@@ -165,6 +165,7 @@ select {
   padding: 6px;
   border-radius: 6px;
   cursor: pointer;
+  min-width: 0;
 }
 
 .move-row:hover {
@@ -186,12 +187,18 @@ select {
   width: 90px;
 }
 
+.bar-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .bar {
   height: 18px;
   background: #2b9cff;
   border-radius: 3px;
-  display: inline-block;
-  vertical-align: middle;
+  display: block;
+  max-width: 100%;
 }
 
 .bar-empty {

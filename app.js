@@ -36,15 +36,14 @@ function renderMovesList(flatMoves) {
       emptyBar.className = "bar-empty";
       barWrap.appendChild(emptyBar);
     } else {
-      const widthPx = durationToBarWidth(mv.duration, maxDur, {
-        minWidth: 6,
-        maxWidth: 260,
-        fallbackWidth: 40,
+      const widthPercent = durationToBarPercent(mv.duration, maxDur, {
+        minPercent: 2,
+        maxPercent: 100,
+        fallbackPercent: 15,
       });
       const bar = document.createElement("div");
       bar.className = "bar";
-      bar.style.width = widthPx + "px";
-      bar.style.maxWidth = "100%";
+      bar.style.width = widthPercent + "%";
       barWrap.appendChild(bar);
     }
     const t = document.createElement("div");
