@@ -146,7 +146,12 @@ async function loadArchivesForUser(username) {
       renderMovesList(flatMoves);
       updateMoveNavigation();
       el("gameMeta").textContent = "No game loaded.";
-      svg.innerHTML = "";
+      if (typeof Chess !== "undefined") {
+        drawInitialBoard();
+      } else {
+        el("board").innerHTML = "";
+        svg.innerHTML = "";
+      }
     }
   } catch (err) {
     currentGame = null;
