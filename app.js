@@ -191,6 +191,7 @@ el("loadGamesBtn").addEventListener("click", () => {
     alert("Enter a chess.com username");
     return;
   }
+  updateUsernameInUrl(username);
   loadArchivesForUser(username);
 });
 el("gamesSelect").addEventListener("change", onGameSelectChange);
@@ -200,7 +201,27 @@ el("username").addEventListener("keydown", (e) => {
   if (e.key === "Enter") el("loadGamesBtn").click();
 });
 
-// On load, focus username
+// Read the username from the URL query string (supports ?user= or ?username=)
+function getUsernameFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("user") || params.get("username") || "";
+}
+
+// Update the URL (without reloading the page) to reflect the current username
+function updateUsernameInUrl(username) {
+  const params = new URLSearchParams(window.location.search);
+  params.set("user", username);
+  const newUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+  window.history.replaceState(null, "", newUrl);
+}
+
+// On load, prefill username from URL (if present) and auto-load games; otherwise focus the field
 (function () {
-  el("username").focus();
+  const usernameFromUrl = getUsernameFromUrl();
+  if (usernameFromUrl) {
+    el("username").value = usernameFromUrl;
+    loadArchivesForUser(usernameFromUrl);
+  } else {
+    el("username").focus();
+  }
 })();
