@@ -239,6 +239,26 @@ function computeDurations(parsedMoves, initialTime, increment) {
   return result;
 }
 
+// Map a move duration to a pixel width for the timeline bar.
+// Uses logarithmic compression so very long moves do not dominate layout while
+// preserving monotonic growth with duration.
+function durationToBarWidth(duration, maxDuration, opts) {
+  const options = opts || {};
+  const minWidth = Number.isFinite(options.minWidth) ? options.minWidth : 6;
+  const maxWidth = Number.isFinite(options.maxWidth) ? options.maxWidth : 260;
+  const fallbackWidth = Number.isFinite(options.fallbackWidth) ? options.fallbackWidth : 40;
+
+  if (duration == null || isNaN(duration)) return fallbackWidth;
+
+  const safeDuration = Math.max(0, duration);
+  const safeMax = Number.isFinite(maxDuration) ? Math.max(0, maxDuration) : 0;
+  if (safeMax <= 0 || maxWidth <= minWidth) return minWidth;
+
+  const ratio = Math.log1p(safeDuration) / Math.log1p(safeMax);
+  const clampedRatio = Math.min(1, Math.max(0, ratio));
+  return Math.round(minWidth + clampedRatio * (maxWidth - minWidth));
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     el,
@@ -249,5 +269,6 @@ if (typeof module !== "undefined" && module.exports) {
     getGameTypeLabel,
     parseMovesWithClocks,
     computeDurations,
+    durationToBarWidth,
   };
 }

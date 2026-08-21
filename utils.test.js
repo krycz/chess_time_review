@@ -4,6 +4,7 @@ const {
   parseTimeControl,
   parseMovesWithClocks,
   computeDurations,
+  durationToBarWidth,
   fmtSeconds,
 } = require("./utils.js");
 
@@ -188,6 +189,34 @@ describe("Regression: 900+10 rapid game with increment", () => {
     const flat = computeDurations(parsedMoves, initial, increment);
     flat.forEach((mv) => {
       expect(mv.duration).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // durationToBarWidth
+  // ---------------------------------------------------------------------------
+  describe("durationToBarWidth", () => {
+    test("returns fallback width for null/invalid durations", () => {
+      expect(durationToBarWidth(null, 100)).toBe(40);
+      expect(durationToBarWidth(NaN, 100)).toBe(40);
+    });
+
+    test("is monotonic with duration", () => {
+      const max = 600;
+      const w1 = durationToBarWidth(5, max);
+      const w2 = durationToBarWidth(30, max);
+      const w3 = durationToBarWidth(120, max);
+      const w4 = durationToBarWidth(600, max);
+      expect(w1).toBeLessThanOrEqual(w2);
+      expect(w2).toBeLessThanOrEqual(w3);
+      expect(w3).toBeLessThanOrEqual(w4);
+    });
+
+    test("respects configured min and max width bounds", () => {
+      const minWidth = 8;
+      const maxWidth = 180;
+      expect(durationToBarWidth(0, 300, { minWidth, maxWidth })).toBe(minWidth);
+      expect(durationToBarWidth(300, 300, { minWidth, maxWidth })).toBe(maxWidth);
     });
   });
 
