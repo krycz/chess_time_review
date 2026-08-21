@@ -167,12 +167,12 @@ select {
   cursor: pointer;
 }
 
-.move-row:hover,
-.move-row.active {
+.move-row:hover {
   background: #f7f7f7;
 }
 
 .move-row.active {
+  background: #f7f7f7;
   outline: 1px solid #2b9cff;
 }
 
