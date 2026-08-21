@@ -6,6 +6,7 @@ let flatMoves = []; // computed moves with durations
 let moveSanList = []; // SAN list for chess.js moves
 let initialTimeSeconds = null;
 let currentGameList = [];
+let selectedMoveIndex = -1;
 
 // Render moves list and durations
 function renderMovesList(flatMoves) {
@@ -20,6 +21,7 @@ function renderMovesList(flatMoves) {
   flatMoves.forEach((mv, idx) => {
     const row = document.createElement("div");
     row.className = "move-row";
+    if (idx === selectedMoveIndex) row.classList.add("active");
     row.dataset.plyIndex = mv.index;
     const num = document.createElement("div");
     num.className = "move-number small";
@@ -50,9 +52,55 @@ function renderMovesList(flatMoves) {
     row.appendChild(san);
     row.appendChild(barWrap);
     row.appendChild(t);
-    row.addEventListener("click", () => onMoveClick(mv.index));
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.addEventListener("click", () => setSelectedMoveIndex(idx));
+    row.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        setSelectedMoveIndex(idx);
+      }
+    });
     container.appendChild(row);
   });
+}
+
+function updateMoveNavigation() {
+  const hasSelection = selectedMoveIndex >= 0 && flatMoves.length > 0;
+  el("prevMoveBtn").disabled = !hasSelection || selectedMoveIndex === 0;
+  el("nextMoveBtn").disabled = !hasSelection || selectedMoveIndex === flatMoves.length - 1;
+}
+
+function drawInitialBoard() {
+  const chess = new Chess();
+  const pgn = currentGame && currentGame.pgn ? currentGame.pgn : "";
+  const fen = getPgnTag(pgn, "FEN");
+  if (fen) chess.load(fen);
+  drawBoard(chess);
+  highlightSquares(null, null);
+  svg.innerHTML = "";
+}
+
+function renderSelectedMove() {
+  renderMovesList(flatMoves);
+  updateMoveNavigation();
+  if (selectedMoveIndex < 0 || selectedMoveIndex >= flatMoves.length) {
+    drawInitialBoard();
+    return;
+  }
+  onMoveClick(flatMoves[selectedMoveIndex].index);
+  const activeRow = el("movesList").querySelector(".move-row.active");
+  if (activeRow) activeRow.scrollIntoView({ block: "nearest" });
+}
+
+function setSelectedMoveIndex(index) {
+  if (flatMoves.length === 0) {
+    selectedMoveIndex = -1;
+    renderSelectedMove();
+    return;
+  }
+  selectedMoveIndex = Math.max(0, Math.min(index, flatMoves.length - 1));
+  renderSelectedMove();
 }
 
 async function loadArchivesForUser(username) {
@@ -78,6 +126,12 @@ async function loadArchivesForUser(username) {
     // Populate select with recent games (limit 80)
     const select = el("gamesSelect");
     select.innerHTML = "";
+    if (games.length === 0) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No games found in latest archive";
+      select.appendChild(opt);
+    }
     games.slice(0, 80).forEach((g, i) => {
       const opt = document.createElement("option");
       const white = g.white && g.white.username ? g.white.username : g.white ? g.white : "white";
@@ -96,10 +150,36 @@ async function loadArchivesForUser(username) {
     if (games.length > 0) {
       select.selectedIndex = 0;
       await onGameSelectChange();
+    } else {
+      currentGame = null;
+      flatMoves = [];
+      moveSanList = [];
+      selectedMoveIndex = -1;
+      renderMovesList(flatMoves);
+      updateMoveNavigation();
+      el("gameMeta").textContent = "No game loaded.";
+      if (typeof Chess !== "undefined") {
+        drawInitialBoard();
+      } else {
+        el("board").innerHTML = "";
+        svg.innerHTML = "";
+      }
     }
   } catch (err) {
+    currentGame = null;
+    flatMoves = [];
+    moveSanList = [];
+    selectedMoveIndex = -1;
     el("status").textContent = "";
     el("movesList").textContent = "Error: " + err.message;
+    el("gameMeta").textContent = "No game loaded.";
+    updateMoveNavigation();
+    if (typeof Chess !== "undefined") {
+      drawInitialBoard();
+    } else {
+      el("board").innerHTML = "";
+      svg.innerHTML = "";
+    }
   }
 }
 
@@ -133,16 +213,10 @@ async function onGameSelectChange() {
     if (m.white && m.white.san) moveSanList.push(m.white.san);
     if (m.black && m.black.san) moveSanList.push(m.black.san);
   });
-  // Render move list
-  renderMovesList(flatMoves);
-  // Initialize chess.js and show starting full board (before move 0)
-  const chess = new Chess();
-  // reset with starting FEN if present
-  const fen = getPgnTag(pgn, "FEN");
-  if (fen) chess.load(fen);
-  drawBoard(chess);
-  svg.innerHTML = "";
-  el("status").textContent = "Game loaded. Click a move to view its starting position and arrow.";
+  setSelectedMoveIndex(flatMoves.length > 0 ? 0 : -1);
+  el("status").textContent = flatMoves.length > 0
+    ? "Game loaded. Use the move list or arrows to review moves."
+    : "Game loaded, but no move data was found.";
 }
 
 // When user clicks a move from the list
@@ -188,8 +262,14 @@ function onMoveClick(plyIndex) {
   if (moveObj) {
     drawArrow(moveObj.from, moveObj.to);
   } else {
+    highlightSquares(null, null);
     svg.innerHTML = "";
   }
+}
+
+function stepSelectedMove(direction) {
+  if (flatMoves.length === 0 || selectedMoveIndex < 0) return;
+  setSelectedMoveIndex(selectedMoveIndex + direction);
 }
 
 // Wire up UI
@@ -203,6 +283,8 @@ el("loadGamesBtn").addEventListener("click", () => {
   loadArchivesForUser(username);
 });
 el("gamesSelect").addEventListener("change", onGameSelectChange);
+el("prevMoveBtn").addEventListener("click", () => stepSelectedMove(-1));
+el("nextMoveBtn").addEventListener("click", () => stepSelectedMove(1));
 
 // Allow pressing enter on username
 el("username").addEventListener("keydown", (e) => {
@@ -225,6 +307,7 @@ function updateUsernameInUrl(username) {
 
 // On load, prefill username from URL (if present) and auto-load games; otherwise focus the field
 (function () {
+  updateMoveNavigation();
   const usernameFromUrl = getUsernameFromUrl();
   if (usernameFromUrl) {
     el("username").value = usernameFromUrl;

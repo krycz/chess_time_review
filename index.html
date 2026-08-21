@@ -8,21 +8,34 @@
 </head>
 <body>
   <h1>Chess.com Move-Time Visualizer</h1>
-  <div class="controls">
-    <label for="username">Chess.com username</label>
-    <input id="username" type="text" placeholder="e.g. magnuscarlsen" value="" />
-    <button id="loadGamesBtn">Load recent games</button>
-    <select id="gamesSelect"></select>
-    <span id="status" class="small"></span>
+  <div class="controls-stack">
+    <div class="controls-row">
+      <label for="username">Chess.com username</label>
+      <div class="controls-input-group">
+        <input id="username" type="text" placeholder="e.g. magnuscarlsen" value="" />
+        <button id="loadGamesBtn">Load recent games</button>
+      </div>
+      <span id="status" class="small"></span>
+    </div>
+    <div class="controls-row">
+      <label for="gamesSelect">Select game</label>
+      <select id="gamesSelect">
+        <option value="">Load a user first</option>
+      </select>
+    </div>
   </div>
 
   <div class="layout">
-    <div>
+    <div class="moves-panel">
       <div class="info" id="gameMeta">No game loaded.</div>
       <div class="moves-list" id="movesList">Load a user and choose a game to see moves and durations.</div>
+      <div class="move-navigation" aria-label="Move navigation">
+        <button id="prevMoveBtn" type="button" aria-label="Previous move">←</button>
+        <button id="nextMoveBtn" type="button" aria-label="Next move">→</button>
+      </div>
     </div>
 
-    <div>
+    <div class="board-panel">
       <div id="boardTitle" class="small">Board (position before selected move)</div>
       <div class="board-wrap">
         <table id="board" class="board" aria-label="Chessboard"></table>
