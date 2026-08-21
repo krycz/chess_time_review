@@ -30,6 +30,7 @@ function renderMovesList(flatMoves) {
     san.className = "move-san";
     san.textContent = mv.san;
     const barWrap = document.createElement("div");
+    barWrap.className = "bar-wrap";
     if (mv.duration == null || isNaN(mv.duration)) {
       const emptyBar = document.createElement("div");
       emptyBar.className = "bar-empty";
@@ -43,6 +44,7 @@ function renderMovesList(flatMoves) {
       const bar = document.createElement("div");
       bar.className = "bar";
       bar.style.width = widthPx + "px";
+      bar.style.maxWidth = "100%";
       barWrap.appendChild(bar);
     }
     const t = document.createElement("div");
