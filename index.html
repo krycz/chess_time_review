@@ -35,8 +35,14 @@
     Notes: This reads public chess.com archives. Durations are computed from PGN clock annotations ([%clk H:MM:SS]) when present. If clocks are not present, move durations won't be available.
   </footer>
 
-  <!-- chess.js from CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chess.js/dist/chess.js"></script>
+  <!-- chess.js from CDN (UMD build that exposes global `Chess`) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <script>
+    // quick runtime check to help debugging if CDN build doesn't expose Chess
+    if (typeof Chess === 'undefined' && typeof window !== 'undefined' && typeof window.Chess === 'undefined') {
+      console.error('Chess library not loaded: Chess is undefined. Check the chess.js script include.');
+    }
+  </script>
   <script src="utils.js"></script>
   <script src="board.js"></script>
   <script src="app.js"></script>
