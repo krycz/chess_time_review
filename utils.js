@@ -4,18 +4,36 @@ function el(id) {
   return document.getElementById(id);
 }
 
-// Format seconds to HH:MM:SS or MM:SS display
-// Correctly handles negative times (e.g., -4:23 from incremental clocks)
+// Format seconds to "Nd H:MM:SS", "H:MM:SS" or "M:SS" display.
+// Durations are always expected to be non-negative; if a negative or
+// invalid value sneaks in, it is treated as 0.
 function fmtSeconds(s) {
   if (s == null || isNaN(s)) return "-";
-  const sign = s < 0 ? "-" : "";
-  s = Math.abs(Math.round(s));
-  const hh = Math.floor(s / 3600);
-  const mm = Math.floor((s % 3600) / 60);
-  const ss = s % 60;
-  return hh > 0
-    ? sign + String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0") + ":" + String(ss).padStart(2, "0")
-    : sign + String(mm).padStart(1, "0") + ":" + String(ss).padStart(2, "0");
+  s = Math.round(s);
+  if (s < 0) s = 0;
+
+  const SEC_PER_DAY = 86400;
+  const days = Math.floor(s / SEC_PER_DAY);
+  const rem = s - days * SEC_PER_DAY;
+  const hh = Math.floor(rem / 3600);
+  const mm = Math.floor((rem % 3600) / 60);
+  const ss = rem % 60;
+
+  if (days > 0) {
+    return (
+      days +
+      "d " +
+      String(hh).padStart(2, "0") +
+      ":" +
+      String(mm).padStart(2, "0") +
+      ":" +
+      String(ss).padStart(2, "0")
+    );
+  }
+  if (hh > 0) {
+    return String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0") + ":" + String(ss).padStart(2, "0");
+  }
+  return String(mm).padStart(1, "0") + ":" + String(ss).padStart(2, "0");
 }
 
 // Parse clock "H:MM:SS" or "MM:SS" to seconds
@@ -25,6 +43,33 @@ function parseClockToSeconds(s) {
   if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
   if (parts.length === 2) return parts[0] * 60 + parts[1];
   return parseInt(parts[0] || 0, 10);
+}
+
+// Parse a chess.com/PGN TimeControl string into { initial, increment } in seconds.
+// Supported formats:
+//  - "600"        -> 600s, no increment
+//  - "600+5"      -> 600s initial, 5s increment per move
+//  - "1/259200"   -> daily/correspondence: N days per move (converted to seconds), no increment
+// Returns { initial: number|null, increment: number }
+function parseTimeControl(tc) {
+  if (!tc) return { initial: null, increment: 0 };
+  // Daily format like "1/259200" (moves-per-period / seconds)
+  if (tc.indexOf("/") > -1) {
+    const [, secondsStr] = tc.split("/");
+    const seconds = parseInt(secondsStr, 10);
+    return { initial: Number.isFinite(seconds) ? seconds : null, increment: 0 };
+  }
+  if (tc.indexOf("+") > -1) {
+    const [initStr, incStr] = tc.split("+");
+    const initial = parseInt(initStr, 10);
+    const increment = parseInt(incStr, 10);
+    return {
+      initial: Number.isFinite(initial) ? initial : null,
+      increment: Number.isFinite(increment) ? increment : 0,
+    };
+  }
+  const initial = parseInt(tc, 10);
+  return { initial: Number.isFinite(initial) ? initial : null, increment: 0 };
 }
 
 // Extract tag value from PGN tags
@@ -111,9 +156,17 @@ function parseMovesWithClocks(pgn) {
   return moves;
 }
 
-// Compute per-move durations (in seconds) from parsed move list and initialTime (seconds) if available.
+// Compute per-move durations (in seconds) from parsed move list, an initialTime (seconds)
+// and an increment (seconds) added back to the clock after each move, if available.
+//
+// A player's clock after a move equals: clockBefore - duration + increment.
+// So: duration = clockBefore + increment - clockAfter.
+// Any residual negative value (e.g. due to lag compensation or rounding in the
+// source data) is clamped to 0 so displayed durations are always non-negative.
+//
 // Returns flattened array of moves in order (index starting 0) with {index, ply, color, san, clkAfter, duration}
-function computeDurations(parsedMoves, initialTime) {
+function computeDurations(parsedMoves, initialTime, increment) {
+  const inc = increment || 0;
   const result = [];
   // Keep previous clock by color
   let prevClock = {
@@ -127,7 +180,10 @@ function computeDurations(parsedMoves, initialTime) {
     if (w && w.san) {
       const after = w.clk;
       let dur = null;
-      if (after != null && prevClock.w != null) dur = prevClock.w - after;
+      if (after != null && prevClock.w != null) {
+        dur = prevClock.w + inc - after;
+        if (dur < 0) dur = 0;
+      }
       // update prevClock.w to after if present
       if (after != null) prevClock.w = after;
       result.push({ index: plyIndex, ply: plyIndex + 1, color: "w", san: w.san, clkAfter: after, duration: dur });
@@ -138,7 +194,10 @@ function computeDurations(parsedMoves, initialTime) {
     if (b && b.san) {
       const after = b.clk;
       let dur = null;
-      if (after != null && prevClock.b != null) dur = prevClock.b - after;
+      if (after != null && prevClock.b != null) {
+        dur = prevClock.b + inc - after;
+        if (dur < 0) dur = 0;
+      }
       if (after != null) prevClock.b = after;
       result.push({ index: plyIndex, ply: plyIndex + 1, color: "b", san: b.san, clkAfter: after, duration: dur });
       plyIndex++;
