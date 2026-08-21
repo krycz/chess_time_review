@@ -192,34 +192,6 @@ describe("Regression: 900+10 rapid game with increment", () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // durationToBarWidth
-  // ---------------------------------------------------------------------------
-  describe("durationToBarWidth", () => {
-    test("returns fallback width for null/invalid durations", () => {
-      expect(durationToBarWidth(null, 100)).toBe(40);
-      expect(durationToBarWidth(NaN, 100)).toBe(40);
-    });
-
-    test("is monotonic with duration", () => {
-      const max = 600;
-      const w1 = durationToBarWidth(5, max);
-      const w2 = durationToBarWidth(30, max);
-      const w3 = durationToBarWidth(120, max);
-      const w4 = durationToBarWidth(600, max);
-      expect(w1).toBeLessThanOrEqual(w2);
-      expect(w2).toBeLessThanOrEqual(w3);
-      expect(w3).toBeLessThanOrEqual(w4);
-    });
-
-    test("respects configured min and max width bounds", () => {
-      const minWidth = 8;
-      const maxWidth = 180;
-      expect(durationToBarWidth(0, 300, { minWidth, maxWidth })).toBe(minWidth);
-      expect(durationToBarWidth(300, 300, { minWidth, maxWidth })).toBe(maxWidth);
-    });
-  });
-
   test("no color has all-zero durations while the other has large values", () => {
     const { initial, increment } = parseTimeControl("900+10");
     const parsedMoves = parseMovesWithClocks(RAPID_PGN);
@@ -249,6 +221,38 @@ describe("Regression: 900+10 rapid game with increment", () => {
       if (mv.duration != null) {
         expect(mv.duration).toBeLessThan(120);
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // durationToBarWidth
+  // ---------------------------------------------------------------------------
+  describe("durationToBarWidth", () => {
+    test("returns fallback width for null/invalid durations", () => {
+      expect(durationToBarWidth(null, 100)).toBe(40);
+      expect(durationToBarWidth(NaN, 100)).toBe(40);
+      expect(durationToBarWidth(5, 0)).toBe(40);
+      expect(durationToBarWidth(5, NaN)).toBe(40);
+      expect(durationToBarWidth(5, -10)).toBe(40);
+    });
+
+    test("is monotonic with duration", () => {
+      const max = 600;
+      const w1 = durationToBarWidth(5, max);
+      const w2 = durationToBarWidth(30, max);
+      const w3 = durationToBarWidth(120, max);
+      const w4 = durationToBarWidth(600, max);
+      expect(w1).toBeLessThanOrEqual(w2);
+      expect(w2).toBeLessThanOrEqual(w3);
+      expect(w3).toBeLessThanOrEqual(w4);
+    });
+
+    test("respects configured min and max width bounds", () => {
+      const minWidth = 8;
+      const maxWidth = 180;
+      expect(durationToBarWidth(0, 300, { minWidth, maxWidth })).toBe(minWidth);
+      expect(durationToBarWidth(300, 300, { minWidth, maxWidth })).toBe(maxWidth);
+      expect(durationToBarWidth(600, 300, { minWidth, maxWidth })).toBe(maxWidth);
     });
   });
 });

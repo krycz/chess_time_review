@@ -247,16 +247,19 @@ function durationToBarWidth(duration, maxDuration, opts) {
   const minWidth = Number.isFinite(options.minWidth) ? options.minWidth : 6;
   const maxWidth = Number.isFinite(options.maxWidth) ? options.maxWidth : 260;
   const fallbackWidth = Number.isFinite(options.fallbackWidth) ? options.fallbackWidth : 40;
+  const startWidth = Math.min(minWidth, maxWidth);
+  const endWidth = Math.max(minWidth, maxWidth);
 
   if (duration == null || isNaN(duration)) return fallbackWidth;
 
   const safeDuration = Math.max(0, duration);
   const safeMax = Number.isFinite(maxDuration) ? Math.max(0, maxDuration) : 0;
-  if (safeMax <= 0 || maxWidth <= minWidth) return minWidth;
+  if (safeMax <= 0) return fallbackWidth;
+  if (endWidth === startWidth) return startWidth;
 
   const ratio = Math.log1p(safeDuration) / Math.log1p(safeMax);
   const clampedRatio = Math.min(1, Math.max(0, ratio));
-  return Math.round(minWidth + clampedRatio * (maxWidth - minWidth));
+  return Math.round(startWidth + clampedRatio * (endWidth - startWidth));
 }
 
 if (typeof module !== "undefined" && module.exports) {
