@@ -113,12 +113,11 @@ async function onGameSelectChange() {
   const pgn = game.pgn || "";
   const parsedMoves = parseMovesWithClocks(pgn);
   // initial time try to detect from TimeControl in PGN or game.time_control
-  let timeControl = getPgnTag(pgn, "TimeControl") || game.time_control || null;
-  if (timeControl && timeControl.indexOf("+") > -1) timeControl = timeControl.split("+")[0];
-  const initial = timeControl ? parseInt(timeControl, 10) : null;
-  initialTimeSeconds = Number.isFinite(initial) ? initial : null;
+  const timeControl = getPgnTag(pgn, "TimeControl") || game.time_control || null;
+  const { initial, increment } = parseTimeControl(timeControl);
+  initialTimeSeconds = initial;
   // compute flat moves
-  flatMoves = computeDurations(parsedMoves, initialTimeSeconds);
+  flatMoves = computeDurations(parsedMoves, initialTimeSeconds, increment);
   // Build move SAN list (flatten SANs in order) to feed chess.js
   moveSanList = [];
   parsedMoves.forEach((m) => {
