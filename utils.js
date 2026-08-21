@@ -250,7 +250,7 @@ function durationToBarWidth(duration, maxDuration, opts) {
   const startWidth = Math.min(minWidth, maxWidth);
   const endWidth = Math.max(minWidth, maxWidth);
 
-  if (duration == null || isNaN(duration)) return fallbackWidth;
+if (!Number.isFinite(duration)) return fallbackWidth;
 
   const safeDuration = Math.max(0, duration);
   const safeMax = Number.isFinite(maxDuration) ? Math.max(0, maxDuration) : 0;
