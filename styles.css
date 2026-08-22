@@ -259,6 +259,8 @@ select {
   color: #222;
   font-variant-numeric: tabular-nums;
   margin-left: auto;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .move-navigation {
@@ -363,12 +365,11 @@ footer {
   }
 
   .move-row {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 
   .move-time {
-    width: 100%;
-    text-align: left;
-    margin-left: 0;
+    text-align: right;
+    margin-left: auto;
   }
 }
