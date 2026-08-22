@@ -205,6 +205,7 @@ async function onGameSelectChange() {
   if (loadedUsername && black.toLowerCase() === loadedUsername) {
     userColor = "b";
   } else {
+    // Default to white if the username matches white or is unrecognised
     userColor = "w";
   }
   // parse PGN
