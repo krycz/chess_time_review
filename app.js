@@ -22,6 +22,8 @@ function renderMovesList(flatMoves) {
   flatMoves.forEach((mv, idx) => {
     const row = document.createElement("div");
     row.className = "move-row";
+    const isUserMove = mv.color === userColor;
+    row.classList.add(isUserMove ? "move-row-user" : "move-row-opponent");
     if (idx === selectedMoveIndex) row.classList.add("active");
     row.dataset.plyIndex = mv.index;
     const num = document.createElement("div");

@@ -231,6 +231,14 @@ select {
   width: 90px;
 }
 
+.move-row-user .move-san {
+  color: #2b9cff;
+}
+
+.move-row-opponent .move-san {
+  color: #777;
+}
+
 .bar-wrap {
   flex: 1;
   min-width: 0;
@@ -243,6 +251,10 @@ select {
   border-radius: 3px;
   display: block;
   max-width: 100%;
+}
+
+.move-row-opponent .bar {
+  background: #b6b6b6;
 }
 
 .bar-empty {
