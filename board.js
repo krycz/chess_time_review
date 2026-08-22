@@ -21,6 +21,9 @@ function fileRankToSquare(file, rank) {
   return String.fromCharCode(96 + file) + rank;
 }
 
+// Current board orientation: "w" means white at bottom (default), "b" means black at bottom.
+let boardOrientation = "w";
+
 // Convert an algebraic square (e.g. "e4") into 0-100 percentage coordinates
 // on an 8x8 grid, independent of DOM layout measurements. This keeps the
 // arrow overlay perfectly aligned with the board regardless of borders,
@@ -30,8 +33,9 @@ function squareToPercentCoords(square) {
   const file = square.charCodeAt(0) - 97; // 0 (a) .. 7 (h)
   const rank = parseInt(square[1], 10); // 1..8
   if (isNaN(file) || isNaN(rank) || file < 0 || file > 7 || rank < 1 || rank > 8) return null;
-  const col = file; // 0 = a-file (left)
-  const row = 8 - rank; // 0 = rank 8 (top)
+  // When orientation is "b" (black at bottom), flip both axes.
+  const col = boardOrientation === "b" ? 7 - file : file;
+  const row = boardOrientation === "b" ? rank - 1 : 8 - rank;
   return {
     x: (col + 0.5) * 12.5,
     y: (row + 0.5) * 12.5,
@@ -43,15 +47,24 @@ function squareCenter(square) {
   return squareToPercentCoords(square);
 }
 
-// Draw board position from a chess.js instance
-function drawBoard(chessInstance) {
+// Draw board position from a chess.js instance.
+// orientation: "w" = white at bottom (default), "b" = black at bottom.
+function drawBoard(chessInstance, orientation) {
+  if (orientation === "w" || orientation === "b") boardOrientation = orientation;
   // chessInstance.board() returns 8x8 array with null or {type,color}
   const board = chessInstance.board();
   boardEl.innerHTML = "";
+  // Determine rank/file iteration order based on orientation.
+  const ranks = boardOrientation === "b"
+    ? [1, 2, 3, 4, 5, 6, 7, 8]
+    : [8, 7, 6, 5, 4, 3, 2, 1];
+  const files = boardOrientation === "b"
+    ? [8, 7, 6, 5, 4, 3, 2, 1]
+    : [1, 2, 3, 4, 5, 6, 7, 8];
   // make table rows
-  for (let rank = 8; rank >= 1; rank--) {
+  for (const rank of ranks) {
     const tr = document.createElement("tr");
-    for (let file = 1; file <= 8; file++) {
+    for (const file of files) {
       const td = document.createElement("td");
       const isLight = (file + rank) % 2 === 0;
       td.className = isLight ? "light" : "dark";
