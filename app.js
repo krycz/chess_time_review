@@ -54,6 +54,12 @@ function getOutcomeEmoji(game, myColor) {
   return "❔";
 }
 
+function getColorPawnEmoji(myColor) {
+  if (myColor === "w") return "♙";
+  if (myColor === "b") return "♟️";
+  return "♟️";
+}
+
 // Render moves list and durations
 function renderMovesList(flatMoves) {
   const container = el("movesList");
@@ -185,10 +191,12 @@ async function loadArchivesForUser(username) {
       const opt = document.createElement("option");
       const perspective = getGamePerspective(g, username);
       const when = formatGameSelectDate(g.end_time);
-      const colorEmoji = perspective.myColor === "b" ? "♟️" : "♙";
+      const colorEmoji = getColorPawnEmoji(perspective.myColor);
       const outcomeEmoji = getOutcomeEmoji(g, perspective.myColor);
       opt.value = i;
-      opt.textContent = `${when} — ${colorEmoji} ${perspective.opponent} — ${outcomeEmoji}`;
+      const labelParts = [`${colorEmoji} ${perspective.opponent}`, outcomeEmoji];
+      if (when) labelParts.unshift(when);
+      opt.textContent = labelParts.join(" — ");
       opt.dataset.gameIndex = i;
       select.appendChild(opt);
     });
