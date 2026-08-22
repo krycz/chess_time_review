@@ -8,6 +8,51 @@ let initialTimeSeconds = null;
 let currentGameList = [];
 let selectedMoveIndex = -1;
 let userColor = "w"; // "w" or "b": color the user played in the current game
+const DRAW_RESULTS = new Set(["agreed", "repetition", "stalemate", "insufficient", "50move", "timevsinsufficient"]);
+const LOSS_RESULTS = new Set(["checkmated", "resigned", "timeout", "lose", "abandoned"]);
+
+function getGamePlayerName(player, fallback) {
+  if (!player) return fallback;
+  if (typeof player === "string") return player;
+  return player.username || fallback;
+}
+
+function formatGameSelectDate(endTime) {
+  if (!endTime) return "";
+  const d = new Date(endTime * 1000);
+  const month = d.getMonth() + 1;
+  const day = String(d.getDate()).padStart(2, "0");
+  const hours24 = d.getHours();
+  const hours12 = hours24 % 12 || 12;
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${month}/${day} ${hours12}:${minutes}`;
+}
+
+function getGamePerspective(game, username) {
+  const white = getGamePlayerName(game && game.white, "white");
+  const black = getGamePlayerName(game && game.black, "black");
+  const loadedUsername = (username || "").trim().toLowerCase();
+  if (loadedUsername && white.toLowerCase() === loadedUsername) {
+    return { white, black, myColor: "w", opponent: black };
+  }
+  if (loadedUsername && black.toLowerCase() === loadedUsername) {
+    return { white, black, myColor: "b", opponent: white };
+  }
+  return { white, black, myColor: null, opponent: `${white} vs ${black}` };
+}
+
+function getOutcomeEmoji(game, myColor) {
+  if (!game || !myColor) return "❔";
+  const mySide = myColor === "w" ? game.white : game.black;
+  const oppSide = myColor === "w" ? game.black : game.white;
+  const myResult = mySide && mySide.result ? mySide.result : "";
+  const oppResult = oppSide && oppSide.result ? oppSide.result : "";
+
+  if (myResult === "win" || LOSS_RESULTS.has(oppResult)) return "✅";
+  if (DRAW_RESULTS.has(myResult) || DRAW_RESULTS.has(oppResult)) return "🤝";
+  if (LOSS_RESULTS.has(myResult) || oppResult === "win") return "❌";
+  return "❔";
+}
 
 // Render moves list and durations
 function renderMovesList(flatMoves) {
@@ -138,12 +183,12 @@ async function loadArchivesForUser(username) {
     }
     games.slice(0, 80).forEach((g, i) => {
       const opt = document.createElement("option");
-      const white = g.white && g.white.username ? g.white.username : g.white ? g.white : "white";
-      const black = g.black && g.black.username ? g.black.username : g.black ? g.black : "black";
-      const when = g.end_time ? new Date(g.end_time * 1000).toLocaleString() : "";
-      const typeLabel = getGameTypeLabel(g);
+      const perspective = getGamePerspective(g, username);
+      const when = formatGameSelectDate(g.end_time);
+      const colorEmoji = perspective.myColor === "b" ? "♟️" : "♙";
+      const outcomeEmoji = getOutcomeEmoji(g, perspective.myColor);
       opt.value = i;
-      opt.textContent = `${when} — ${typeLabel} — ${white} vs ${black}`;
+      opt.textContent = `${when} — ${colorEmoji} ${perspective.opponent} — ${outcomeEmoji}`;
       opt.dataset.gameIndex = i;
       select.appendChild(opt);
     });
@@ -195,16 +240,16 @@ async function onGameSelectChange() {
   if (!game) return;
   currentGame = game;
   // Show metadata
-  const white = game.white && game.white.username ? game.white.username : "white";
-  const black = game.black && game.black.username ? game.black.username : "black";
+  const perspective = getGamePerspective(game, el("username").value);
+  const white = perspective.white;
+  const black = perspective.black;
   const when = game.end_time ? new Date(game.end_time * 1000).toLocaleString() : "";
   const typeLabel = getGameTypeLabel(game);
   el(
     "gameMeta"
   ).textContent = `${white} vs ${black} — ${when} — ${typeLabel}`;
   // Determine which color the logged-in user is playing
-  const loadedUsername = el("username").value.trim().toLowerCase();
-  if (loadedUsername && black.toLowerCase() === loadedUsername) {
+  if (perspective.myColor === "b") {
     userColor = "b";
   } else {
     // Default to white if the username matches white or is unrecognised
