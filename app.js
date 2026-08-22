@@ -191,10 +191,11 @@ async function loadArchivesForUser(username) {
       const opt = document.createElement("option");
       const perspective = getGamePerspective(g, username);
       const when = formatGameSelectDate(g.end_time);
+      const typeLabel = getGameTypeLabel(g);
       const colorEmoji = getColorPawnEmoji(perspective.myColor);
       const outcomeEmoji = getOutcomeEmoji(g, perspective.myColor);
       opt.value = i;
-      const labelParts = [`${colorEmoji} ${perspective.opponent}`, outcomeEmoji];
+      const labelParts = [`${colorEmoji} ${perspective.opponent}`, typeLabel, outcomeEmoji];
       if (when) labelParts.unshift(when);
       opt.textContent = labelParts.join(" — ");
       opt.dataset.gameIndex = i;
