@@ -57,7 +57,7 @@ function getOutcomeEmoji(game, myColor) {
 function getColorPawnEmoji(myColor) {
   if (myColor === "w") return "♙";
   if (myColor === "b") return "♟️";
-  return "♟️";
+  return "❔";
 }
 
 // Render moves list and durations
