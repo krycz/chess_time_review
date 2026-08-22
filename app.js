@@ -7,6 +7,7 @@ let moveSanList = []; // SAN list for chess.js moves
 let initialTimeSeconds = null;
 let currentGameList = [];
 let selectedMoveIndex = -1;
+let userColor = "w"; // "w" or "b": color the user played in the current game
 
 // Render moves list and durations
 function renderMovesList(flatMoves) {
@@ -77,7 +78,7 @@ function drawInitialBoard() {
   const pgn = currentGame && currentGame.pgn ? currentGame.pgn : "";
   const fen = getPgnTag(pgn, "FEN");
   if (fen) chess.load(fen);
-  drawBoard(chess);
+  drawBoard(chess, userColor);
   highlightSquares(null, null);
   svg.innerHTML = "";
 }
@@ -199,6 +200,13 @@ async function onGameSelectChange() {
   el(
     "gameMeta"
   ).textContent = `${white} vs ${black} — ${when} — ${typeLabel}`;
+  // Determine which color the logged-in user is playing
+  const loadedUsername = el("username").value.trim().toLowerCase();
+  if (loadedUsername && black.toLowerCase() === loadedUsername) {
+    userColor = "b";
+  } else {
+    userColor = "w";
+  }
   // parse PGN
   const pgn = game.pgn || "";
   const parsedMoves = parseMovesWithClocks(pgn);
@@ -251,7 +259,7 @@ function onMoveClick(plyIndex) {
     if (moveObj) chess.undo();
   }
   // draw position before move
-  drawBoard(chess);
+  drawBoard(chess, userColor);
   // draw arrow if we have moveObj or can compute move from sloppy attempt
   if (!moveObj && nextSan) {
     // try to compute legal moves that match SAN
