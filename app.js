@@ -22,10 +22,9 @@ function formatGameSelectDate(endTime) {
   const d = new Date(endTime * 1000);
   const month = d.getMonth() + 1;
   const day = String(d.getDate()).padStart(2, "0");
-  const hours24 = d.getHours();
-  const hours12 = hours24 % 12 || 12;
+  const hours = String(d.getHours()).padStart(2, "0");
   const minutes = String(d.getMinutes()).padStart(2, "0");
-  return `${month}/${day} ${hours12}:${minutes}`;
+  return `${month}/${day} ${hours}:${minutes}`;
 }
 
 function getGamePerspective(game, username) {
@@ -54,9 +53,9 @@ function getOutcomeEmoji(game, myColor) {
   return "❔";
 }
 
-function getColorPawnEmoji(myColor) {
-  if (myColor === "w") return "♙";
-  if (myColor === "b") return "♟️";
+function getColorPieceEmoji(myColor) {
+  if (myColor === "w") return "♔";
+  if (myColor === "b") return "♚";
   return "❔";
 }
 
@@ -192,7 +191,7 @@ async function loadArchivesForUser(username) {
       const perspective = getGamePerspective(g, username);
       const when = formatGameSelectDate(g.end_time);
       const typeLabel = getGameTypeLabel(g);
-      const colorEmoji = getColorPawnEmoji(perspective.myColor);
+      const colorEmoji = getColorPieceEmoji(perspective.myColor);
       const outcomeEmoji = getOutcomeEmoji(g, perspective.myColor);
       opt.value = i;
       const labelParts = [`${colorEmoji} ${perspective.opponent}`, typeLabel, outcomeEmoji];
@@ -250,13 +249,8 @@ async function onGameSelectChange() {
   currentGame = game;
   // Show metadata
   const perspective = getGamePerspective(game, el("username").value);
-  const white = perspective.white;
-  const black = perspective.black;
-  const when = game.end_time ? new Date(game.end_time * 1000).toLocaleString() : "";
   const typeLabel = getGameTypeLabel(game);
-  el(
-    "gameMeta"
-  ).textContent = `${white} vs ${black} — ${when} — ${typeLabel}`;
+  el("gameMeta").textContent = typeLabel;
   // Determine which color the logged-in user is playing
   if (perspective.myColor === "b") {
     userColor = "b";
