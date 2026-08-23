@@ -247,7 +247,6 @@ async function onGameSelectChange() {
   currentGame = game;
   // Show metadata
   const perspective = getGamePerspective(game, el("username").value);
-  const typeLabel = getGameTypeLabel(game);
   // Determine which color the logged-in user is playing
   if (perspective.myColor === "b") {
     userColor = "b";
