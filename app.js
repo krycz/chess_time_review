@@ -125,6 +125,23 @@ function updateMoveNavigation() {
   el("nextMoveBtn").disabled = !hasSelection || selectedMoveIndex === flatMoves.length - 1;
 }
 
+function scrollMoveRowIntoListView(container, row) {
+  if (!container || !row) return;
+  const rowTop = row.offsetTop;
+  const rowBottom = rowTop + row.offsetHeight;
+  const viewTop = container.scrollTop;
+  const viewBottom = viewTop + container.clientHeight;
+
+  if (rowTop < viewTop) {
+    container.scrollTop = rowTop;
+    return;
+  }
+
+  if (rowBottom > viewBottom) {
+    container.scrollTop = rowBottom - container.clientHeight;
+  }
+}
+
 function drawInitialBoard() {
   const chess = new Chess();
   const pgn = currentGame && currentGame.pgn ? currentGame.pgn : "";
@@ -143,8 +160,9 @@ function renderSelectedMove() {
     return;
   }
   onMoveClick(flatMoves[selectedMoveIndex].index);
-  const activeRow = el("movesList").querySelector(".move-row.active");
-  if (activeRow) activeRow.scrollIntoView({ block: "center" });
+  const movesList = el("movesList");
+  const activeRow = movesList.querySelector(".move-row.active");
+  if (activeRow) scrollMoveRowIntoListView(movesList, activeRow);
 }
 
 function setSelectedMoveIndex(index) {
