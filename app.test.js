@@ -12,8 +12,9 @@ function getIdsFromHtml(html) {
 
 function getDomIdRefs(source) {
   return new Set([
-    ...[...source.matchAll(/el\("([^"]+)"\)/g)].map((match) => match[1]),
+    ...[...source.matchAll(/\bel\("([^"]+)"\)/g)].map((match) => match[1]),
     ...[...source.matchAll(/getElementById\("([^"]+)"\)/g)].map((match) => match[1]),
+    ...[...source.matchAll(/querySelector\("#([^"]+)"\)/g)].map((match) => match[1]),
   ]);
 }
 
