@@ -17,7 +17,6 @@
   <div class="controls-stack">
     <span id="status" class="small"></span>
     <div class="controls-row game-select-row">
-      <label for="gamesSelect" class="game-select-label">Game:</label>
       <select id="gamesSelect">
         <option value="">Load a user first</option>
       </select>
@@ -26,7 +25,6 @@
 
   <div class="layout">
     <div class="moves-panel">
-      <div class="info" id="gameMeta">No game loaded.</div>
       <div class="moves-list" id="movesList">Load a user and choose a game to see moves and durations.</div>
       <div class="move-navigation" aria-label="Move navigation">
         <button id="prevMoveBtn" type="button" aria-label="Previous move">←</button>
@@ -35,7 +33,6 @@
     </div>
 
     <div class="board-panel">
-      <div id="boardTitle" class="small">Board (position before selected move)</div>
       <div class="board-wrap">
         <table id="board" class="board" aria-label="Chessboard"></table>
         <svg class="svg-overlay" id="svgOverlay" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>

@@ -214,7 +214,6 @@ async function loadArchivesForUser(username) {
       selectedMoveIndex = -1;
       renderMovesList(flatMoves);
       updateMoveNavigation();
-      el("gameMeta").textContent = "No game loaded.";
       if (typeof Chess !== "undefined") {
         drawInitialBoard();
       } else {
@@ -229,7 +228,6 @@ async function loadArchivesForUser(username) {
     selectedMoveIndex = -1;
     el("status").textContent = "";
     el("movesList").textContent = "Error: " + err.message;
-    el("gameMeta").textContent = "No game loaded.";
     updateMoveNavigation();
     if (typeof Chess !== "undefined") {
       drawInitialBoard();
@@ -250,7 +248,6 @@ async function onGameSelectChange() {
   // Show metadata
   const perspective = getGamePerspective(game, el("username").value);
   const typeLabel = getGameTypeLabel(game);
-  el("gameMeta").textContent = typeLabel;
   // Determine which color the logged-in user is playing
   if (perspective.myColor === "b") {
     userColor = "b";
@@ -275,7 +272,7 @@ async function onGameSelectChange() {
   });
   setSelectedMoveIndex(flatMoves.length > 0 ? 0 : -1);
   el("status").textContent = flatMoves.length > 0
-    ? "Game loaded. Use the move list or arrows to review moves."
+    ? ""
     : "Game loaded, but no move data was found.";
 }
 
