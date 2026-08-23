@@ -346,6 +346,12 @@ el("gamesSelect").addEventListener("change", onGameSelectChange);
 el("prevMoveBtn").addEventListener("click", () => stepSelectedMove(-1));
 el("nextMoveBtn").addEventListener("click", () => stepSelectedMove(1));
 
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowLeft") { e.preventDefault(); stepSelectedMove(-1); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); stepSelectedMove(1); }
+});
+
 // Allow pressing enter on username
 el("username").addEventListener("keydown", (e) => {
   if (e.key === "Enter") el("loadGamesBtn").click();
