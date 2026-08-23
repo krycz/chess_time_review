@@ -138,7 +138,7 @@ function renderCapturedPieces(chessInstance) {
 
   const { capturedByWhite, capturedByBlack, delta } = getCapturedPieces(chessInstance);
 
-  function buildRow(captured, color, label) {
+  function buildRow(captured, color) {
     const row = document.createElement("div");
     row.className = "captured-row";
     const pieces = document.createElement("span");
@@ -156,9 +156,9 @@ function renderCapturedPieces(chessInstance) {
   }
 
   // White row: pieces taken by black (black captures white pieces, shown as white glyphs)
-  const whiteRow = buildRow(capturedByBlack, "w", "white");
+  const whiteRow = buildRow(capturedByBlack, "w");
   // Black row: pieces taken by white (white captures black pieces, shown as black glyphs)
-  const blackRow = buildRow(capturedByWhite, "b", "black");
+  const blackRow = buildRow(capturedByWhite, "b");
 
   // Attach delta to the side that's ahead
   if (delta > 0) {
@@ -173,8 +173,8 @@ function renderCapturedPieces(chessInstance) {
     whiteRow.appendChild(d);
   }
 
-  container.appendChild(blackRow);
   container.appendChild(whiteRow);
+  container.appendChild(blackRow);
 }
 
 // Highlight the from/to squares of the last move
