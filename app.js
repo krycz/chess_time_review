@@ -144,7 +144,7 @@ function renderSelectedMove() {
   }
   onMoveClick(flatMoves[selectedMoveIndex].index);
   const activeRow = el("movesList").querySelector(".move-row.active");
-  if (activeRow) activeRow.scrollIntoView({ block: "nearest" });
+  if (activeRow) activeRow.scrollIntoView({ block: "center" });
 }
 
 function setSelectedMoveIndex(index) {
