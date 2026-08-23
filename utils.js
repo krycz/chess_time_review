@@ -93,23 +93,21 @@ function getGameTypeLabel(game) {
     daily: "📅",
   };
   const emoji = emojiMap[timeClass] || "♟️";
-  let label = timeClass ? timeClass.charAt(0).toUpperCase() + timeClass.slice(1) : "Game";
 
-  if (!tc) return `${emoji} ${label}`;
+  if (!tc) return emoji;
 
   const { initial, increment } = parseTimeControl(tc);
-  if (initial == null) return `${emoji} ${label}`;
+  if (initial == null) return emoji;
 
   if (timeClass === "daily") {
     const days = initial / 86400;
     const daysStr = Number.isInteger(days) ? days : days.toFixed(1);
-    label += ` ${daysStr}d/move`;
+    return `${emoji} ${daysStr}d/move`;
   } else {
     const minutes = initial / 60;
     const minStr = Number.isInteger(minutes) ? minutes : minutes.toFixed(1);
-    label += ` ${minStr}+${increment}`;
+    return `${emoji} ${minStr}+${increment}`;
   }
-  return `${emoji} ${label}`;
 }
 
 // Parse moves and clocks from PGN into an array of {moveNumber, white: {san, clk}, black: {san, clk}}
