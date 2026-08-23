@@ -206,7 +206,7 @@ select {
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 6px;
+  padding: 3px 6px;
   border-radius: 6px;
   cursor: pointer;
   min-width: 0;
