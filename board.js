@@ -85,6 +85,96 @@ function drawBoard(chessInstance, orientation) {
   svg.setAttribute("viewBox", "0 0 100 100");
   svg.setAttribute("preserveAspectRatio", "none");
   svg.innerHTML = "";
+  renderCapturedPieces(chessInstance);
+}
+
+// Piece point values
+const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+// Unicode glyphs for captured piece display (always render as colored pieces)
+const CAPTURED_GLYPHS = {
+  p: { w: "♙", b: "♟" },
+  r: { w: "♖", b: "♜" },
+  n: { w: "♘", b: "♞" },
+  b: { w: "♗", b: "♝" },
+  q: { w: "♕", b: "♛" },
+};
+
+// Piece order for display (least to most valuable)
+const PIECE_ORDER = ["p", "n", "b", "r", "q"];
+
+// Compute which pieces have been captured for each color.
+// Returns { capturedByWhite: {p,n,b,r,q}, capturedByBlack: {p,n,b,r,q}, delta: number }
+// capturedByWhite = pieces white has taken (i.e. black pieces off the board)
+// delta > 0 means white is ahead in material
+function getCapturedPieces(chessInstance) {
+  const start = { p: 8, n: 2, b: 2, r: 2, q: 1 };
+  const onBoard = { w: { p: 0, n: 0, b: 0, r: 0, q: 0 }, b: { p: 0, n: 0, b: 0, r: 0, q: 0 } };
+  const board = chessInstance.board();
+  for (const row of board) {
+    for (const sq of row) {
+      if (sq && sq.type !== "k" && onBoard[sq.color][sq.type] != null) {
+        onBoard[sq.color][sq.type]++;
+      }
+    }
+  }
+  // capturedByWhite = black pieces taken by white = start - onBoard black
+  const capturedByWhite = {};
+  const capturedByBlack = {};
+  let delta = 0;
+  for (const pt of PIECE_ORDER) {
+    capturedByWhite[pt] = Math.max(0, start[pt] - onBoard.b[pt]);
+    capturedByBlack[pt] = Math.max(0, start[pt] - onBoard.w[pt]);
+    delta += (capturedByWhite[pt] - capturedByBlack[pt]) * PIECE_VALUES[pt];
+  }
+  return { capturedByWhite, capturedByBlack, delta };
+}
+
+// Render captured pieces below the board
+function renderCapturedPieces(chessInstance) {
+  const container = document.getElementById("capturedPieces");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const { capturedByWhite, capturedByBlack, delta } = getCapturedPieces(chessInstance);
+
+  function buildRow(captured, color, label) {
+    const row = document.createElement("div");
+    row.className = "captured-row";
+    const pieces = document.createElement("span");
+    pieces.className = "captured-glyphs";
+    for (const pt of PIECE_ORDER) {
+      for (let i = 0; i < captured[pt]; i++) {
+        const span = document.createElement("span");
+        span.className = "cap-piece cap-piece-" + color;
+        span.textContent = CAPTURED_GLYPHS[pt][color];
+        pieces.appendChild(span);
+      }
+    }
+    row.appendChild(pieces);
+    return row;
+  }
+
+  // White row: pieces taken by black (black captures white pieces, shown as white glyphs)
+  const whiteRow = buildRow(capturedByBlack, "w", "white");
+  // Black row: pieces taken by white (white captures black pieces, shown as black glyphs)
+  const blackRow = buildRow(capturedByWhite, "b", "black");
+
+  // Attach delta to the side that's ahead
+  if (delta > 0) {
+    const d = document.createElement("span");
+    d.className = "captured-delta";
+    d.textContent = "+" + delta;
+    blackRow.appendChild(d);
+  } else if (delta < 0) {
+    const d = document.createElement("span");
+    d.className = "captured-delta";
+    d.textContent = "+" + Math.abs(delta);
+    whiteRow.appendChild(d);
+  }
+
+  container.appendChild(blackRow);
+  container.appendChild(whiteRow);
 }
 
 // Highlight the from/to squares of the last move

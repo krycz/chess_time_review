@@ -305,6 +305,57 @@ footer {
   color: #666;
 }
 
+/* Captured pieces display below the board */
+.captured-pieces {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 36px;
+}
+
+.captured-row {
+  display: flex;
+  align-items: center;
+  min-height: 16px;
+  flex-wrap: wrap;
+  gap: 1px;
+}
+
+.captured-glyphs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  line-height: 1;
+}
+
+.cap-piece {
+  font-family: "Segoe UI Symbol", "Noto Sans Symbols2", "DejaVu Sans", "Arial Unicode MS", sans-serif;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.cap-piece-w {
+  color: #fbfbfb;
+  text-shadow:
+    -1px -1px 0 #2b2b2b,
+    1px -1px 0 #2b2b2b,
+    -1px 1px 0 #2b2b2b,
+    1px 1px 0 #2b2b2b;
+}
+
+.cap-piece-b {
+  color: #1a1a1a;
+}
+
+.captured-delta {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #333;
+  margin-left: 6px;
+  align-self: center;
+}
+
 @media (min-width: 901px) {
   body {
     padding: 16px;
