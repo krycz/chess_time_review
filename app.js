@@ -127,8 +127,10 @@ function updateMoveNavigation() {
 
 function scrollMoveRowIntoListView(container, row) {
   if (!container || !row) return;
-  const rowTop = row.offsetTop;
-  const rowBottom = rowTop + row.offsetHeight;
+  const containerRect = container.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  const rowTop = rowRect.top - containerRect.top + container.scrollTop;
+  const rowBottom = rowTop + rowRect.height;
   const viewTop = container.scrollTop;
   const viewBottom = viewTop + container.clientHeight;
 
