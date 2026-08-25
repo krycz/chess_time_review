@@ -259,6 +259,82 @@ function durationToBarPercent(duration, maxDuration, opts) {
   return startPercent + clampedRatio * (endPercent - startPercent);
 }
 
+// Piece point values used for material delta computation.
+const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+// Piece order for display (least to most valuable, kings excluded).
+const PIECE_ORDER = ["p", "n", "b", "r", "q"];
+
+// Starting counts per side in a standard game.
+const PIECE_START = { p: 8, n: 2, b: 2, r: 2, q: 1 };
+
+// Compute which pieces have been captured for each color from a board snapshot.
+//
+// Accepts either a chess.js instance (with a .board() method) or a plain 8x8
+// array (same format as chess.js .board() returns) so that unit tests can pass
+// board states directly without needing a full chess.js instance.
+//
+// Returns { capturedByWhite, capturedByBlack, delta }
+//   capturedByWhite  – pieces white has taken  (black pieces off the board)
+//   capturedByBlack  – pieces black has taken  (white pieces off the board)
+//   delta            – material advantage: >0 white is ahead, <0 black is ahead
+//
+// Pawn promotion is handled correctly: a promoted piece counts against its
+// owner's pawn total (i.e. that pawn is treated as still belonging to its
+// owner, just in promoted form) rather than inflating the opponent's captures.
+//
+// Algorithm (mirrors chess.com / Lichess):
+//   promotedExtra[color][type] = max(0, onBoard[color][type] - start[type])
+//   captured[color][p]         = max(0, start[p] - onBoard[color][p] - sum(promotedExtra[color]))
+//   captured[color][type≠p]    = max(0, start[type] - onBoard[color][type] + promotedExtra[color][type])
+function getCapturedPieces(chessInstanceOrBoard) {
+  const board = typeof chessInstanceOrBoard.board === "function"
+    ? chessInstanceOrBoard.board()
+    : chessInstanceOrBoard;
+
+  const onBoard = {
+    w: { p: 0, n: 0, b: 0, r: 0, q: 0 },
+    b: { p: 0, n: 0, b: 0, r: 0, q: 0 },
+  };
+  for (const row of board) {
+    for (const sq of row) {
+      if (sq && sq.type !== "k" && onBoard[sq.color][sq.type] != null) {
+        onBoard[sq.color][sq.type]++;
+      }
+    }
+  }
+
+  function capturedForColor(color) {
+    // Extra pieces beyond starting count = promotions from pawns.
+    const promotedExtra = { n: 0, b: 0, r: 0, q: 0 };
+    let totalPromoted = 0;
+    for (const pt of ["n", "b", "r", "q"]) {
+      promotedExtra[pt] = Math.max(0, onBoard[color][pt] - PIECE_START[pt]);
+      totalPromoted += promotedExtra[pt];
+    }
+    const captured = {};
+    // Pawns: subtract promoted ones since they are still "on the board" in disguise.
+    captured["p"] = Math.max(0, PIECE_START["p"] - onBoard[color]["p"] - totalPromoted);
+    // Other pieces: add back any extras that are actually promoted pawns.
+    for (const pt of ["n", "b", "r", "q"]) {
+      captured[pt] = Math.max(0, PIECE_START[pt] - onBoard[color][pt] + promotedExtra[pt]);
+    }
+    return captured;
+  }
+
+  // capturedByWhite = black pieces that white has taken (count what's missing from black's set)
+  const capturedByWhite = capturedForColor("b");
+  // capturedByBlack = white pieces that black has taken (count what's missing from white's set)
+  const capturedByBlack = capturedForColor("w");
+
+  let delta = 0;
+  for (const pt of PIECE_ORDER) {
+    delta += (capturedByWhite[pt] - capturedByBlack[pt]) * PIECE_VALUES[pt];
+  }
+
+  return { capturedByWhite, capturedByBlack, delta };
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     el,
@@ -270,5 +346,8 @@ if (typeof module !== "undefined" && module.exports) {
     parseMovesWithClocks,
     computeDurations,
     durationToBarPercent,
+    getCapturedPieces,
+    PIECE_ORDER,
+    PIECE_VALUES,
   };
 }
