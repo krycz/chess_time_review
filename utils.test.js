@@ -304,14 +304,9 @@ describe("getCapturedPieces", () => {
   });
 
   test("white takes one black pawn: capturedByWhite.p = 1, delta = +1", () => {
-    const pieces = startingPieces().filter((p, i) => {
-      // Remove one black pawn (first occurrence)
-      if (p.color === "b" && p.type === "p") {
-        const firstBlackPawn = startingPieces().findIndex((x) => x.color === "b" && x.type === "p");
-        return i !== firstBlackPawn;
-      }
-      return true;
-    });
+    const all = startingPieces();
+    const firstBlackPawn = all.findIndex((x) => x.color === "b" && x.type === "p");
+    const pieces = all.filter((_, i) => i !== firstBlackPawn);
     const board = makeBoard(pieces);
     const { capturedByWhite, capturedByBlack, delta } = getCapturedPieces(board);
     expect(capturedByWhite.p).toBe(1);
@@ -398,5 +393,20 @@ describe("getCapturedPieces", () => {
     const chessLike = { board: () => makeBoard(startingPieces()) };
     const { delta } = getCapturedPieces(chessLike);
     expect(delta).toBe(0);
+  });
+
+  test("hidden promotion edge case: pawn promotes to queen then promoted queen captured", () => {
+    // Net board state: 7 pawns + 1 queen for white (same as if pawn was just captured).
+    // Without move history, the board snapshot cannot distinguish "pawn captured" from
+    // "pawn promoted, then promoted piece was captured". We assert the known behaviour:
+    // the missing pawn shows up as capturedByBlack.p = 1.
+    const all = startingPieces();
+    const firstWhiteP = all.findIndex((x) => x.color === "w" && x.type === "p");
+    const pieces = all.filter((_, i) => i !== firstWhiteP); // 7 white pawns, 1 queen (original)
+    const board = makeBoard(pieces);
+    const { capturedByBlack } = getCapturedPieces(board);
+    // Known limitation matches chess.com / Lichess behaviour for this board snapshot.
+    expect(capturedByBlack.p).toBe(1);
+    expect(capturedByBlack.q).toBe(0);
   });
 });

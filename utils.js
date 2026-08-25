@@ -279,14 +279,20 @@ const PIECE_START = { p: 8, n: 2, b: 2, r: 2, q: 1 };
 //   capturedByBlack  – pieces black has taken  (white pieces off the board)
 //   delta            – material advantage: >0 white is ahead, <0 black is ahead
 //
-// Pawn promotion is handled correctly: a promoted piece counts against its
-// owner's pawn total (i.e. that pawn is treated as still belonging to its
-// owner, just in promoted form) rather than inflating the opponent's captures.
+// Pawn promotion is handled correctly: a promoted piece that is still on the
+// board is counted as a "visible promotion" and subtracted from missing pawns,
+// so the pawn does not appear as captured by the opponent.
 //
-// Algorithm (mirrors chess.com / Lichess):
-//   promotedExtra[color][type] = max(0, onBoard[color][type] - start[type])
-//   captured[color][p]         = max(0, start[p] - onBoard[color][p] - sum(promotedExtra[color]))
-//   captured[color][type≠p]    = max(0, start[type] - onBoard[color][type] + promotedExtra[color][type])
+// Edge case: if a pawn promotes to type T and then the resulting piece is
+// captured, the board count for type T equals start[T], so the promotion and
+// the subsequent capture are both invisible from the board snapshot alone.
+// chess.com and Lichess exhibit the same limitation without move history, so
+// we match their display behaviour (showing 0 for that edge case).
+//
+// Algorithm:
+//   visiblePromotions = sum(max(0, onBoard[color][t] - start[t])  for t in {n,b,r,q})
+//   captured[p]       = max(0, (start[p] - onBoard[color][p]) - visiblePromotions)
+//   captured[t≠p]     = max(0, start[t] - onBoard[color][t])
 function getCapturedPieces(chessInstanceOrBoard) {
   const board = typeof chessInstanceOrBoard.board === "function"
     ? chessInstanceOrBoard.board()
@@ -305,19 +311,25 @@ function getCapturedPieces(chessInstanceOrBoard) {
   }
 
   function capturedForColor(color) {
-    // Extra pieces beyond starting count = promotions from pawns.
-    const promotedExtra = { n: 0, b: 0, r: 0, q: 0 };
-    let totalPromoted = 0;
+    // Count pieces beyond the starting count — these are pawns that promoted
+    // and are still on the board ("visible" promotions).
+    let visiblePromotions = 0;
     for (const pt of ["n", "b", "r", "q"]) {
-      promotedExtra[pt] = Math.max(0, onBoard[color][pt] - PIECE_START[pt]);
-      totalPromoted += promotedExtra[pt];
+      visiblePromotions += Math.max(0, onBoard[color][pt] - PIECE_START[pt]);
     }
+
+    const pawnsGone = PIECE_START["p"] - onBoard[color]["p"];
+
     const captured = {};
-    // Pawns: subtract promoted ones since they are still "on the board" in disguise.
-    captured["p"] = Math.max(0, PIECE_START["p"] - onBoard[color]["p"] - totalPromoted);
-    // Other pieces: add back any extras that are actually promoted pawns.
+    // Pawns: some missing pawns promoted instead of being captured.
+    // Only the ones not accounted for by visible promotions count as captured.
+    captured["p"] = Math.max(0, pawnsGone - visiblePromotions);
+    // Non-pawn pieces: use apparent deficit (start - on board). This handles
+    // the common case correctly. The one unresolvable edge case — pawn promotes
+    // to type T and then that piece is captured — is a known limitation shared
+    // with chess.com and Lichess when operating from a board snapshot only.
     for (const pt of ["n", "b", "r", "q"]) {
-      captured[pt] = Math.max(0, PIECE_START[pt] - onBoard[color][pt] + promotedExtra[pt]);
+      captured[pt] = Math.max(0, PIECE_START[pt] - onBoard[color][pt]);
     }
     return captured;
   }
