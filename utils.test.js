@@ -349,7 +349,8 @@ describe("getCapturedPieces", () => {
     expect(capturedByBlack.p).toBe(0);
     expect(capturedByBlack.q).toBe(0);
     expect(capturedByWhite).toEqual({ p: 0, n: 0, b: 0, r: 0, q: 0 });
-    expect(delta).toBe(0);
+    // White traded a pawn (1pt) for a queen (9pt): net +8.
+    expect(delta).toBe(8);
   });
 
   test("pawn promotion after capturing a piece: white promotes pawn (takes black rook), black queen captured", () => {
@@ -369,7 +370,8 @@ describe("getCapturedPieces", () => {
     expect(capturedByBlack.p).toBe(0);
     expect(capturedByWhite.r).toBe(1);
     expect(capturedByWhite.q).toBe(1);
-    expect(delta).toBe(14); // 5 (rook) + 9 (queen)
+    // White: 7p+2q+2n+2b+2r=47, Black: 8p+0q+2n+2b+1r=25, delta=+22.
+    expect(delta).toBe(22);
   });
 
   test("multiple promotions: white promotes 2 pawns to queens", () => {
@@ -386,7 +388,8 @@ describe("getCapturedPieces", () => {
     const board = makeBoard(pieces);
     const { capturedByBlack, delta } = getCapturedPieces(board);
     expect(capturedByBlack.p).toBe(0);
-    expect(delta).toBe(0);
+    // White: 6p+3q+2n+2b+2r=55, Black: 8p+1q+2n+2b+2r=39, delta=+16.
+    expect(delta).toBe(16);
   });
 
   test("accepts a chess.js-style instance with .board() method", () => {

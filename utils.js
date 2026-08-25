@@ -339,9 +339,12 @@ function getCapturedPieces(chessInstanceOrBoard) {
   // capturedByBlack = white pieces that black has taken (count what's missing from white's set)
   const capturedByBlack = capturedForColor("w");
 
+  // Delta is the material advantage based on what is actually on the board.
+  // Using on-board material (rather than captured-piece difference) means that
+  // a promoted queen is counted at full value for its owner.
   let delta = 0;
   for (const pt of PIECE_ORDER) {
-    delta += (capturedByWhite[pt] - capturedByBlack[pt]) * PIECE_VALUES[pt];
+    delta += (onBoard.w[pt] - onBoard.b[pt]) * PIECE_VALUES[pt];
   }
 
   return { capturedByWhite, capturedByBlack, delta };
