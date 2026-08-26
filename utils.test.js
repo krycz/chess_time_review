@@ -335,7 +335,7 @@ describe("getCapturedPieces", () => {
     // Expected: capturedByBlack.p = 0 (the pawn promoted, wasn't captured by black),
     //           capturedByBlack.q = 0 (white has an extra queen but it's not a black capture),
     //           capturedByWhite = all zeros (black lost nothing),
-    //           delta = 0 (no material exchanged).
+    //           delta = +8 (promotion increases on-board material by 8 points).
     const pieces = startingPieces()
       .filter((p, i, arr) => {
         // Remove one white pawn
