@@ -91,15 +91,23 @@ function drawBoard(chessInstance, orientation) {
 // Piece point values
 // (PIECE_VALUES and PIECE_ORDER are defined in utils.js)
 
-// Unicode glyphs for captured piece display – one neutral glyph per piece type.
-// CSS classes (cap-piece-w / cap-piece-b) apply color and text-shadow to match
-// the board rendering, so we only need a single outline glyph per type.
+// Unicode glyphs for captured piece display, separated by color so captured
+// white and black pieces remain visually distinct across fonts/platforms.
 const CAPTURED_GLYPHS = {
-  p: "♙",
-  r: "♖",
-  n: "♘",
-  b: "♗",
-  q: "♕",
+  w: {
+    p: "♙",
+    r: "♖",
+    n: "♘",
+    b: "♗",
+    q: "♕",
+  },
+  b: {
+    p: "♟",
+    r: "♜",
+    n: "♞",
+    b: "♝",
+    q: "♛",
+  },
 };
 
 // Render captured pieces below the board
@@ -119,7 +127,7 @@ function renderCapturedPieces(chessInstance) {
       for (let i = 0; i < captured[pt]; i++) {
         const span = document.createElement("span");
         span.className = "cap-piece cap-piece-" + color;
-        span.textContent = CAPTURED_GLYPHS[pt];
+        span.textContent = CAPTURED_GLYPHS[color][pt];
         pieces.appendChild(span);
       }
     }
