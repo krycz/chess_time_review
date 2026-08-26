@@ -259,6 +259,97 @@ function durationToBarPercent(duration, maxDuration, opts) {
   return startPercent + clampedRatio * (endPercent - startPercent);
 }
 
+// Piece point values used for material delta computation.
+const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+// Piece order for display (least to most valuable, kings excluded).
+const PIECE_ORDER = ["p", "n", "b", "r", "q"];
+
+// Starting counts per side in a standard game.
+const PIECE_START = { p: 8, n: 2, b: 2, r: 2, q: 1 };
+
+// Compute which pieces have been captured for each color from a board snapshot.
+//
+// Accepts either a chess.js instance (with a .board() method) or a plain 8x8
+// array (same format as chess.js .board() returns) so that unit tests can pass
+// board states directly without needing a full chess.js instance.
+//
+// Returns { capturedByWhite, capturedByBlack, delta }
+//   capturedByWhite  – pieces white has taken  (black pieces off the board)
+//   capturedByBlack  – pieces black has taken  (white pieces off the board)
+//   delta            – material advantage: >0 white is ahead, <0 black is ahead
+//
+// Pawn promotion is handled correctly: a promoted piece that is still on the
+// board is counted as a "visible promotion" and subtracted from missing pawns,
+// so the pawn does not appear as captured by the opponent.
+//
+// Edge case: if a pawn promotes to type T and then the resulting piece is
+// captured, the board count for type T equals start[T], so the promotion and
+// the subsequent capture are both invisible from the board snapshot alone.
+// chess.com and Lichess exhibit the same limitation without move history, so
+// we match their display behaviour (the missing pawn is shown as captured).
+//
+// Algorithm:
+//   visiblePromotions = sum(max(0, onBoard[color][t] - start[t])  for t in {n,b,r,q})
+//   captured[p]       = max(0, (start[p] - onBoard[color][p]) - visiblePromotions)
+//   captured[t≠p]     = max(0, start[t] - onBoard[color][t])
+function getCapturedPieces(chessInstanceOrBoard) {
+  const board = typeof chessInstanceOrBoard.board === "function"
+    ? chessInstanceOrBoard.board()
+    : chessInstanceOrBoard;
+
+  const onBoard = {
+    w: { p: 0, n: 0, b: 0, r: 0, q: 0 },
+    b: { p: 0, n: 0, b: 0, r: 0, q: 0 },
+  };
+  for (const row of board) {
+    for (const sq of row) {
+      if (sq && sq.type !== "k" && onBoard[sq.color][sq.type] != null) {
+        onBoard[sq.color][sq.type]++;
+      }
+    }
+  }
+
+  function capturedForColor(color) {
+    // Count pieces beyond the starting count — these are pawns that promoted
+    // and are still on the board ("visible" promotions).
+    let visiblePromotions = 0;
+    for (const pt of ["n", "b", "r", "q"]) {
+      visiblePromotions += Math.max(0, onBoard[color][pt] - PIECE_START[pt]);
+    }
+
+    const pawnsGone = PIECE_START["p"] - onBoard[color]["p"];
+
+    const captured = {};
+    // Pawns: some missing pawns promoted instead of being captured.
+    // Only the ones not accounted for by visible promotions count as captured.
+    captured["p"] = Math.max(0, pawnsGone - visiblePromotions);
+    // Non-pawn pieces: use apparent deficit (start - on board). This handles
+    // the common case correctly. The one unresolvable edge case — pawn promotes
+    // to type T and then that piece is captured — is a known limitation shared
+    // with chess.com and Lichess when operating from a board snapshot only.
+    for (const pt of ["n", "b", "r", "q"]) {
+      captured[pt] = Math.max(0, PIECE_START[pt] - onBoard[color][pt]);
+    }
+    return captured;
+  }
+
+  // capturedByWhite = black pieces that white has taken (count what's missing from black's set)
+  const capturedByWhite = capturedForColor("b");
+  // capturedByBlack = white pieces that black has taken (count what's missing from white's set)
+  const capturedByBlack = capturedForColor("w");
+
+  // Delta is the material advantage based on what is actually on the board.
+  // Using on-board material (rather than captured-piece difference) means that
+  // a promoted queen is counted at full value for its owner.
+  let delta = 0;
+  for (const pt of PIECE_ORDER) {
+    delta += (onBoard.w[pt] - onBoard.b[pt]) * PIECE_VALUES[pt];
+  }
+
+  return { capturedByWhite, capturedByBlack, delta };
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     el,
@@ -270,5 +361,8 @@ if (typeof module !== "undefined" && module.exports) {
     parseMovesWithClocks,
     computeDurations,
     durationToBarPercent,
+    getCapturedPieces,
+    PIECE_ORDER,
+    PIECE_VALUES,
   };
 }

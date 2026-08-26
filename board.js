@@ -85,6 +85,68 @@ function drawBoard(chessInstance, orientation) {
   svg.setAttribute("viewBox", "0 0 100 100");
   svg.setAttribute("preserveAspectRatio", "none");
   svg.innerHTML = "";
+  renderCapturedPieces(chessInstance);
+}
+
+// Piece point values
+// (PIECE_VALUES and PIECE_ORDER are defined in utils.js)
+
+// Unicode glyphs for captured piece display – one neutral glyph per piece type.
+// CSS classes (cap-piece-w / cap-piece-b) apply color and text-shadow to match
+// the board rendering, so we only need a single outline glyph per type.
+const CAPTURED_GLYPHS = {
+  p: "♙",
+  r: "♖",
+  n: "♘",
+  b: "♗",
+  q: "♕",
+};
+
+// Render captured pieces below the board
+function renderCapturedPieces(chessInstance) {
+  const container = document.getElementById("capturedPieces");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const { capturedByWhite, capturedByBlack, delta } = getCapturedPieces(chessInstance);
+
+  function buildRow(captured, color) {
+    const row = document.createElement("div");
+    row.className = "captured-row";
+    const pieces = document.createElement("span");
+    pieces.className = "captured-glyphs";
+    for (const pt of PIECE_ORDER) {
+      for (let i = 0; i < captured[pt]; i++) {
+        const span = document.createElement("span");
+        span.className = "cap-piece cap-piece-" + color;
+        span.textContent = CAPTURED_GLYPHS[pt];
+        pieces.appendChild(span);
+      }
+    }
+    row.appendChild(pieces);
+    return row;
+  }
+
+  // White row: pieces taken by black (black captures white pieces, shown as white glyphs)
+  const whiteRow = buildRow(capturedByBlack, "w");
+  // Black row: pieces taken by white (white captures black pieces, shown as black glyphs)
+  const blackRow = buildRow(capturedByWhite, "b");
+
+  // Attach delta to the side that's ahead
+  if (delta > 0) {
+    const d = document.createElement("span");
+    d.className = "captured-delta";
+    d.textContent = "+" + delta;
+    blackRow.appendChild(d);
+  } else if (delta < 0) {
+    const d = document.createElement("span");
+    d.className = "captured-delta";
+    d.textContent = "+" + Math.abs(delta);
+    whiteRow.appendChild(d);
+  }
+
+  container.appendChild(whiteRow);
+  container.appendChild(blackRow);
 }
 
 // Highlight the from/to squares of the last move

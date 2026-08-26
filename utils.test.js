@@ -6,6 +6,7 @@ const {
   computeDurations,
   durationToBarPercent,
   fmtSeconds,
+  getCapturedPieces,
 } = require("./utils.js");
 
 // ---------------------------------------------------------------------------
@@ -254,5 +255,161 @@ describe("Regression: 900+10 rapid game with increment", () => {
       expect(durationToBarPercent(300, 300, { minPercent, maxPercent })).toBe(maxPercent);
       expect(durationToBarPercent(600, 300, { minPercent, maxPercent })).toBe(maxPercent);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getCapturedPieces
+// ---------------------------------------------------------------------------
+
+// Helper: build the 8x8 board array that getCapturedPieces expects.
+// pieces is an array of { type, color } objects; the rest of the squares are null.
+// We just need the flat piece list — position on the board doesn't matter for counting.
+function makeBoard(pieces) {
+  // Fill a flat 64-slot array with nulls, then place pieces.
+  const flat = Array(64).fill(null);
+  pieces.forEach((p, i) => { flat[i] = p; });
+  // Reshape into 8 rows of 8
+  const board = [];
+  for (let r = 0; r < 8; r++) {
+    board.push(flat.slice(r * 8, r * 8 + 8));
+  }
+  return board;
+}
+
+// Build the starting position pieces array (standard chess starting set).
+function startingPieces() {
+  const pieces = [];
+  const add = (color, type, count) => {
+    for (let i = 0; i < count; i++) pieces.push({ color, type });
+  };
+  for (const color of ["w", "b"]) {
+    add(color, "p", 8);
+    add(color, "n", 2);
+    add(color, "b", 2);
+    add(color, "r", 2);
+    add(color, "q", 1);
+    add(color, "k", 1);
+  }
+  return pieces;
+}
+
+describe("getCapturedPieces", () => {
+  test("starting position: no pieces captured, delta 0", () => {
+    const board = makeBoard(startingPieces());
+    const { capturedByWhite, capturedByBlack, delta } = getCapturedPieces(board);
+    expect(capturedByWhite).toEqual({ p: 0, n: 0, b: 0, r: 0, q: 0 });
+    expect(capturedByBlack).toEqual({ p: 0, n: 0, b: 0, r: 0, q: 0 });
+    expect(delta).toBe(0);
+  });
+
+  test("white takes one black pawn: capturedByWhite.p = 1, delta = +1", () => {
+    const all = startingPieces();
+    const firstBlackPawn = all.findIndex((x) => x.color === "b" && x.type === "p");
+    const pieces = all.filter((_, i) => i !== firstBlackPawn);
+    const board = makeBoard(pieces);
+    const { capturedByWhite, capturedByBlack, delta } = getCapturedPieces(board);
+    expect(capturedByWhite.p).toBe(1);
+    expect(capturedByBlack.p).toBe(0);
+    expect(delta).toBe(1);
+  });
+
+  test("each side takes one knight: delta 0, capturedByWhite.n = 1, capturedByBlack.n = 1", () => {
+    const pieces = startingPieces()
+      .filter((p, i, arr) => {
+        // Remove one black knight and one white knight
+        const firstBlackN = arr.findIndex((x) => x.color === "b" && x.type === "n");
+        const firstWhiteN = arr.findIndex((x) => x.color === "w" && x.type === "n");
+        return i !== firstBlackN && i !== firstWhiteN;
+      });
+    const board = makeBoard(pieces);
+    const { capturedByWhite, capturedByBlack, delta } = getCapturedPieces(board);
+    expect(capturedByWhite.n).toBe(1);
+    expect(capturedByBlack.n).toBe(1);
+    expect(delta).toBe(0);
+  });
+
+  test("pawn promotion: white promotes one pawn to queen — does not inflate captures", () => {
+    // White has 7 pawns + 2 queens (one original + one promoted), all other pieces intact.
+    // Black has all pieces intact.
+    // Expected: capturedByBlack.p = 0 (the pawn promoted, wasn't captured by black),
+    //           capturedByBlack.q = 0 (white has an extra queen but it's not a black capture),
+    //           capturedByWhite = all zeros (black lost nothing),
+    //           delta = +8 (promotion increases on-board material by 8 points).
+    const pieces = startingPieces()
+      .filter((p, i, arr) => {
+        // Remove one white pawn
+        const firstWhiteP = arr.findIndex((x) => x.color === "w" && x.type === "p");
+        return i !== firstWhiteP;
+      });
+    // Add an extra white queen (the promoted pawn)
+    pieces.push({ color: "w", type: "q" });
+    const board = makeBoard(pieces);
+    const { capturedByWhite, capturedByBlack, delta } = getCapturedPieces(board);
+    expect(capturedByBlack.p).toBe(0);
+    expect(capturedByBlack.q).toBe(0);
+    expect(capturedByWhite).toEqual({ p: 0, n: 0, b: 0, r: 0, q: 0 });
+    // White traded a pawn (1pt) for a queen (9pt): net +8.
+    expect(delta).toBe(8);
+  });
+
+  test("pawn promotion after capturing a piece: white promotes pawn (takes black rook), black queen captured", () => {
+    // Scenario: white has 7 pawns + 2 queens (one promoted), lost nothing.
+    //           black is missing one rook (captured by white) and one queen (captured by white).
+    // capturedByWhite.r = 1, capturedByWhite.q = 1, capturedByBlack = all zeros, delta = 14.
+    const pieces = startingPieces()
+      .filter((p, i, arr) => {
+        const firstWhiteP = arr.findIndex((x) => x.color === "w" && x.type === "p");
+        const firstBlackR = arr.findIndex((x) => x.color === "b" && x.type === "r");
+        const firstBlackQ = arr.findIndex((x) => x.color === "b" && x.type === "q");
+        return i !== firstWhiteP && i !== firstBlackR && i !== firstBlackQ;
+      });
+    pieces.push({ color: "w", type: "q" }); // promoted pawn
+    const board = makeBoard(pieces);
+    const { capturedByWhite, capturedByBlack, delta } = getCapturedPieces(board);
+    expect(capturedByBlack.p).toBe(0);
+    expect(capturedByWhite.r).toBe(1);
+    expect(capturedByWhite.q).toBe(1);
+    // White: 7p+2q+2n+2b+2r=47, Black: 8p+0q+2n+2b+1r=25, delta=+22.
+    expect(delta).toBe(22);
+  });
+
+  test("multiple promotions: white promotes 2 pawns to queens", () => {
+    // White has 6 pawns + 3 queens. Black has all pieces.
+    const pieces = startingPieces().filter((p, i, arr) => {
+      const whitePs = arr.reduce((acc, x, idx) => {
+        if (x.color === "w" && x.type === "p") acc.push(idx);
+        return acc;
+      }, []);
+      return i !== whitePs[0] && i !== whitePs[1];
+    });
+    pieces.push({ color: "w", type: "q" });
+    pieces.push({ color: "w", type: "q" });
+    const board = makeBoard(pieces);
+    const { capturedByBlack, delta } = getCapturedPieces(board);
+    expect(capturedByBlack.p).toBe(0);
+    // White: 6p+3q+2n+2b+2r=55, Black: 8p+1q+2n+2b+2r=39, delta=+16.
+    expect(delta).toBe(16);
+  });
+
+  test("accepts a chess.js-style instance with .board() method", () => {
+    const chessLike = { board: () => makeBoard(startingPieces()) };
+    const { delta } = getCapturedPieces(chessLike);
+    expect(delta).toBe(0);
+  });
+
+  test("hidden promotion edge case: pawn promotes to queen then promoted queen captured", () => {
+    // Net board state: 7 pawns + 1 queen for white (same as if pawn was just captured).
+    // Without move history, the board snapshot cannot distinguish "pawn captured" from
+    // "pawn promoted, then promoted piece was captured". We assert the known behaviour:
+    // the missing pawn shows up as capturedByBlack.p = 1.
+    const all = startingPieces();
+    const firstWhiteP = all.findIndex((x) => x.color === "w" && x.type === "p");
+    const pieces = all.filter((_, i) => i !== firstWhiteP); // 7 white pawns, 1 queen (original)
+    const board = makeBoard(pieces);
+    const { capturedByBlack } = getCapturedPieces(board);
+    // Known limitation matches chess.com / Lichess behaviour for this board snapshot.
+    expect(capturedByBlack.p).toBe(1);
+    expect(capturedByBlack.q).toBe(0);
   });
 });
