@@ -287,7 +287,7 @@ const PIECE_START = { p: 8, n: 2, b: 2, r: 2, q: 1 };
 // captured, the board count for type T equals start[T], so the promotion and
 // the subsequent capture are both invisible from the board snapshot alone.
 // chess.com and Lichess exhibit the same limitation without move history, so
-// we match their display behaviour (showing 0 for that edge case).
+// we match their display behaviour (the missing pawn is shown as captured).
 //
 // Algorithm:
 //   visiblePromotions = sum(max(0, onBoard[color][t] - start[t])  for t in {n,b,r,q})
