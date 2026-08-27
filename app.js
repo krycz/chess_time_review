@@ -189,21 +189,16 @@ async function loadArchivesForUser(username) {
     // archives is array of URLs ordered oldest->newest
     const archives = data.archives;
     if (!archives || archives.length === 0) throw new Error("No archives found for user.");
-    const recentArchives = archives.slice(-MAX_ARCHIVES_TO_LOAD).reverse();
-    let games = [];
-    let archivesLoaded = 0;
-    for (const archiveUrl of recentArchives) {
-      el("status").textContent = archivesLoaded === 0
-        ? "Loading latest archive..."
-        : "Loading previous archive...";
-      const archiveRes = await fetch(archiveUrl);
-      if (!archiveRes.ok) throw new Error("Could not fetch archive: " + archiveRes.status);
-      const monthData = await archiveRes.json();
-      const monthGames = monthData.games || [];
-      games.push(...monthGames);
-      archivesLoaded++;
-      if (games.length >= MIN_GAMES_TO_LOAD) break;
-    }
+    const { games: loadedGames, archivesLoaded } = await loadRecentGamesFromArchives(fetch, archives, {
+      minGames: MIN_GAMES_TO_LOAD,
+      maxArchives: MAX_ARCHIVES_TO_LOAD,
+      onArchiveLoadStart: (loadedCount) => {
+        el("status").textContent = loadedCount === 0
+          ? "Loading latest archive..."
+          : "Loading previous archive...";
+      },
+    });
+    let games = loadedGames;
     // Show most recent games first (chess.com archives are returned in
     // chronological order, oldest first)
     games = games.slice().sort((a, b) => (b.end_time || 0) - (a.end_time || 0));

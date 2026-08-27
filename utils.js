@@ -259,6 +259,36 @@ function durationToBarPercent(duration, maxDuration, opts) {
   return startPercent + clampedRatio * (endPercent - startPercent);
 }
 
+// Load recent monthly archives newest-first and return enough games for the UI.
+// `archiveUrls` is expected oldest->newest (chess.com archives API order).
+// Stops once minGames is reached or maxArchives have been fetched.
+async function loadRecentGamesFromArchives(fetchImpl, archiveUrls, opts) {
+  const options = opts || {};
+  const minGames = Number.isFinite(options.minGames) ? options.minGames : 6;
+  const maxArchives = Number.isFinite(options.maxArchives) ? options.maxArchives : 4;
+  const onArchiveLoadStart = typeof options.onArchiveLoadStart === "function"
+    ? options.onArchiveLoadStart
+    : null;
+  const fetchFn = typeof fetchImpl === "function" ? fetchImpl : fetch;
+
+  const recentArchives = (archiveUrls || []).slice(-maxArchives).reverse();
+  const games = [];
+  let archivesLoaded = 0;
+
+  for (const archiveUrl of recentArchives) {
+    if (onArchiveLoadStart) onArchiveLoadStart(archivesLoaded);
+    const archiveRes = await fetchFn(archiveUrl);
+    if (!archiveRes.ok) throw new Error("Could not fetch archive: " + archiveRes.status);
+    const monthData = await archiveRes.json();
+    const monthGames = monthData && Array.isArray(monthData.games) ? monthData.games : [];
+    games.push(...monthGames);
+    archivesLoaded++;
+    if (games.length >= minGames) break;
+  }
+
+  return { games, archivesLoaded };
+}
+
 // Piece point values used for material delta computation.
 const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
@@ -361,6 +391,7 @@ if (typeof module !== "undefined" && module.exports) {
     parseMovesWithClocks,
     computeDurations,
     durationToBarPercent,
+    loadRecentGamesFromArchives,
     getCapturedPieces,
     PIECE_ORDER,
     PIECE_VALUES,
