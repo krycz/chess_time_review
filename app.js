@@ -192,8 +192,8 @@ async function loadArchivesForUser(username) {
     const { games: loadedGames, archivesLoaded } = await loadRecentGamesFromArchives(fetch, archives, {
       minGames: MIN_GAMES_TO_LOAD,
       maxArchives: MAX_ARCHIVES_TO_LOAD,
-      onArchiveLoadStart: (loadedCount) => {
-        el("status").textContent = loadedCount === 0
+      onArchiveLoadStart: (archiveIndex) => {
+        el("status").textContent = archiveIndex === 0
           ? "Loading latest archive..."
           : "Loading previous archive...";
       },

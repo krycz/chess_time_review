@@ -462,9 +462,11 @@ describe("loadRecentGamesFromArchives", () => {
       maxArchives: 4,
     });
 
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["latest", "mid2", "mid1"]);
     expect(archivesLoaded).toBe(3);
     expect(games).toHaveLength(6);
+    expect(games.map((g) => g.id)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   test("does not load more than maxArchives", async () => {

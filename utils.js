@@ -275,10 +275,13 @@ async function loadRecentGamesFromArchives(fetchImpl, archiveUrls, opts) {
   const games = [];
   let archivesLoaded = 0;
 
-  for (const archiveUrl of recentArchives) {
-    if (onArchiveLoadStart) onArchiveLoadStart(archivesLoaded);
+  for (const [archiveIndex, archiveUrl] of recentArchives.entries()) {
+    if (onArchiveLoadStart) onArchiveLoadStart(archiveIndex);
     const archiveRes = await fetchFn(archiveUrl);
-    if (!archiveRes.ok) throw new Error("Could not fetch archive: " + archiveRes.status);
+    if (!archiveRes.ok) {
+      const statusText = archiveRes.statusText ? " " + archiveRes.statusText : "";
+      throw new Error("Could not fetch archive " + archiveUrl + ": " + archiveRes.status + statusText);
+    }
     const monthData = await archiveRes.json();
     const monthGames = monthData && Array.isArray(monthData.games) ? monthData.games : [];
     games.push(...monthGames);
