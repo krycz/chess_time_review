@@ -10,6 +10,8 @@ let selectedMoveIndex = -1;
 let userColor = "w"; // "w" or "b": color the user played in the current game
 const DRAW_RESULTS = new Set(["agreed", "repetition", "stalemate", "insufficient", "50move", "timevsinsufficient"]);
 const LOSS_RESULTS = new Set(["checkmated", "resigned", "timeout", "lose", "abandoned"]);
+const MIN_GAMES_TO_LOAD = 6;
+const MAX_ARCHIVES_TO_LOAD = 4; // current month + up to 3 previous months
 
 function getGamePlayerName(player, fallback) {
   if (!player) return fallback;
@@ -184,16 +186,19 @@ async function loadArchivesForUser(username) {
     const res = await fetch(url);
     if (!res.ok) throw new Error("Could not fetch archives: " + res.status);
     const data = await res.json();
-    // archives is array of URLs; choose latest (last)
+    // archives is array of URLs ordered oldest->newest
     const archives = data.archives;
     if (!archives || archives.length === 0) throw new Error("No archives found for user.");
-    // fetch most recent archive only
-    const last = archives[archives.length - 1];
-    el("status").textContent = "Loading latest archive...";
-    const res2 = await fetch(last);
-    if (!res2.ok) throw new Error("Could not fetch latest archive: " + res2.status);
-    const monthData = await res2.json();
-    let games = monthData.games || [];
+    const { games: loadedGames, archivesLoaded } = await loadRecentGamesFromArchives(fetch, archives, {
+      minGames: MIN_GAMES_TO_LOAD,
+      maxArchives: MAX_ARCHIVES_TO_LOAD,
+      onArchiveLoadStart: (archiveIndex) => {
+        el("status").textContent = archiveIndex === 0
+          ? "Loading latest archive..."
+          : "Loading previous archive...";
+      },
+    });
+    let games = loadedGames;
     // Show most recent games first (chess.com archives are returned in
     // chronological order, oldest first)
     games = games.slice().sort((a, b) => (b.end_time || 0) - (a.end_time || 0));
@@ -203,7 +208,7 @@ async function loadArchivesForUser(username) {
     if (games.length === 0) {
       const opt = document.createElement("option");
       opt.value = "";
-      opt.textContent = "No games found in latest archive";
+      opt.textContent = "No games found in recent archives";
       select.appendChild(opt);
     }
     games.slice(0, 80).forEach((g, i) => {
@@ -220,7 +225,8 @@ async function loadArchivesForUser(username) {
       opt.dataset.gameIndex = i;
       select.appendChild(opt);
     });
-    el("status").textContent = "Loaded " + games.length + " games from latest archive.";
+    const archiveWord = archivesLoaded === 1 ? "archive" : "archives";
+    el("status").textContent = "Loaded " + games.length + " games from " + archivesLoaded + " recent " + archiveWord + ".";
     // store month games list in currentGamesList for selection usage
     currentGameList = games;
     // auto-select first if present

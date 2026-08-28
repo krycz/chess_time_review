@@ -5,6 +5,7 @@ const {
   parseMovesWithClocks,
   computeDurations,
   durationToBarPercent,
+  loadRecentGamesFromArchives,
   fmtSeconds,
   getCapturedPieces,
 } = require("./utils.js");
@@ -411,5 +412,78 @@ describe("getCapturedPieces", () => {
     // Known limitation matches chess.com / Lichess behaviour for this board snapshot.
     expect(capturedByBlack.p).toBe(1);
     expect(capturedByBlack.q).toBe(0);
+  });
+});
+
+describe("loadRecentGamesFromArchives", () => {
+  test("loads only latest archive when it already has enough games", async () => {
+    const archiveUrls = [
+      "u1",
+      "u2",
+      "u3",
+      "u4",
+      "u5",
+    ];
+    const responses = {
+      u5: { games: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }, { id: 6 }] },
+    };
+    const fetchMock = jest.fn(async (url) => ({
+      ok: true,
+      status: 200,
+      json: async () => responses[url] || { games: [] },
+    }));
+
+    const { games, archivesLoaded } = await loadRecentGamesFromArchives(fetchMock, archiveUrls, {
+      minGames: 6,
+      maxArchives: 4,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("u5");
+    expect(archivesLoaded).toBe(1);
+    expect(games).toHaveLength(6);
+  });
+
+  test("falls back to previous months until minimum games is reached", async () => {
+    const archiveUrls = ["oldest", "mid1", "mid2", "latest"];
+    const responses = {
+      latest: { games: [{ id: 1 }, { id: 2 }] },
+      mid2: { games: [{ id: 3 }, { id: 4 }, { id: 5 }] },
+      mid1: { games: [{ id: 6 }] },
+    };
+    const fetchMock = jest.fn(async (url) => ({
+      ok: true,
+      status: 200,
+      json: async () => responses[url] || { games: [] },
+    }));
+
+    const { games, archivesLoaded } = await loadRecentGamesFromArchives(fetchMock, archiveUrls, {
+      minGames: 6,
+      maxArchives: 4,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["latest", "mid2", "mid1"]);
+    expect(archivesLoaded).toBe(3);
+    expect(games).toHaveLength(6);
+    expect(games.map((g) => g.id)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  test("does not load more than maxArchives", async () => {
+    const archiveUrls = ["m1", "m2", "m3", "m4", "m5", "m6"];
+    const fetchMock = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ games: [{ id: "g" }] }),
+    }));
+
+    const { games, archivesLoaded } = await loadRecentGamesFromArchives(fetchMock, archiveUrls, {
+      minGames: 20,
+      maxArchives: 4,
+    });
+
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["m6", "m5", "m4", "m3"]);
+    expect(archivesLoaded).toBe(4);
+    expect(games).toHaveLength(4);
   });
 });
