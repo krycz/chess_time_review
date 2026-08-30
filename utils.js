@@ -39,7 +39,9 @@ function fmtSeconds(s) {
 // Parse clock "D:HH:MM:SS", "H:MM:SS", "MM:SS" or "SS.s" to seconds.
 function parseClockToSeconds(s) {
   if (!s) return null;
-  const parts = s.split(":").map((p) => Number(p));
+  const rawParts = s.split(":");
+  if (rawParts.some((part) => part === "")) return null;
+  const parts = rawParts.map((p) => Number(p));
   if (parts.some((part) => !Number.isFinite(part))) return null;
   if (parts.length === 4) return parts[0] * 86400 + parts[1] * 3600 + parts[2] * 60 + parts[3];
   if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
