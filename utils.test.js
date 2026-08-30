@@ -190,10 +190,10 @@ describe("computeDurations", () => {
     const { initial, increment } = parseTimeControl("1/259200");
     const flat = computeDurations(parsedMoves, initial, increment, { isDaily: true });
 
-    expect(flat[0].duration).toBeCloseTo(3227);
-    expect(flat[1].duration).toBeCloseTo(37175);
-    expect(flat[2].duration).toBeCloseTo(28762);
-    expect(flat[3].duration).toBeCloseTo(11751);
+    expect(flat[0].duration).toBeCloseTo(3227); // 0:05:22.7 -> 322.7s -> 3227s
+    expect(flat[1].duration).toBeCloseTo(37175); // 1:01:57.5 -> 3717.5s -> 37175s
+    expect(flat[2].duration).toBeCloseTo(28762); // 0:47:56.2 -> 2876.2s -> 28762s
+    expect(flat[3].duration).toBeCloseTo(11751); // 0:19:35.1 -> 1175.1s -> 11751s
 
     expect(fmtSeconds(flat[0].duration)).toBe("53:47");
     expect(fmtSeconds(flat[1].duration)).toBe("10:19:35");
