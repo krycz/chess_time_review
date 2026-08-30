@@ -40,6 +40,8 @@ function fmtSeconds(s) {
 function parseClockToSeconds(s) {
   if (!s) return null;
   const parts = s.split(":").map((p) => parseInt(p, 10));
+  if (parts.some((part) => !Number.isFinite(part))) return null;
+  if (parts.length === 4) return parts[0] * 86400 + parts[1] * 3600 + parts[2] * 60 + parts[3];
   if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
   if (parts.length === 2) return parts[0] * 60 + parts[1];
   return parseInt(parts[0] || 0, 10);
