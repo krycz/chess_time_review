@@ -30,6 +30,11 @@ describe("parseClockToSeconds", () => {
     expect(parseClockToSeconds("600")).toBe(600);
   });
 
+  test("D:HH:MM:SS format", () => {
+    expect(parseClockToSeconds("2:23:55:00")).toBe(258900);
+    expect(parseClockToSeconds("0:00:04:30")).toBe(270);
+  });
+
   test("null / empty returns null", () => {
     expect(parseClockToSeconds(null)).toBeNull();
     expect(parseClockToSeconds("")).toBeNull();
@@ -166,6 +171,25 @@ describe("computeDurations", () => {
     const flatNoInc = computeDurations(parsedMoves, 900, 0);
     // Without increment, white move 1: 900-895=5 (not 15)
     expect(flatNoInc[0].duration).toBe(5);
+  });
+
+  test("daily games with day-prefixed clocks use actual elapsed time", () => {
+    const dailyPgn = `[Event "Daily Game"]
+[White "kr_cz"]
+[Black "opponent"]
+[TimeControl "1/259200"]
+
+1. e4 {[%clk 2:23:55:00]} e5 {[%clk 2:23:58:30]} 2. Nf3 {[%clk 2:23:51:00]} Nc6 {[%clk 2:23:49:30]} *
+`;
+
+    const parsedMoves = parseMovesWithClocks(dailyPgn);
+    const { initial, increment } = parseTimeControl("1/259200");
+    const flat = computeDurations(parsedMoves, initial, increment);
+
+    expect(flat[0].duration).toBe(300);
+    expect(flat[1].duration).toBe(90);
+    expect(flat[2].duration).toBe(240);
+    expect(flat[3].duration).toBe(540);
   });
 });
 
