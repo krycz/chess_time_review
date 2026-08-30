@@ -201,10 +201,11 @@ function parseMovesWithClocks(pgn) {
 //
 // Chess.com daily/correspondence PGNs are different: multiple moves in the
 // regression sample covered by utils.test.js line up with the Chess.com UI when
-// %clk is multiplied by 10 (for example, 0:05:22.7 -> 53:47 and 1:01:57.5 ->
-// 10:19:35). This is an empirical chess.com-specific heuristic, not a
-// documented PGN standard. For those games, use duration = %clk * 10 rather
-// than treating %clk as remaining time on a countdown clock.
+// %clk is treated as tenths of the displayed move duration (for example,
+// 0:05:22.7 -> 53:47 and 1:01:57.5 -> 10:19:35). This is an empirical
+// chess.com-specific heuristic, not a documented PGN standard. For those games,
+// use duration = %clk * 10 rather than treating %clk as remaining time on a
+// countdown clock.
 //
 // Returns flattened array of moves in order (index starting 0) with {index, ply, color, san, clkAfter, duration}
 function computeDurations(parsedMoves, initialTime, increment, opts) {
