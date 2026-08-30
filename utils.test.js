@@ -30,6 +30,10 @@ describe("parseClockToSeconds", () => {
     expect(parseClockToSeconds("600")).toBe(600);
   });
 
+  test("preserves fractional seconds", () => {
+    expect(parseClockToSeconds("0:05:22.7")).toBeCloseTo(322.7);
+  });
+
   test("D:HH:MM:SS format", () => {
     expect(parseClockToSeconds("2:23:55:00")).toBe(258900);
     expect(parseClockToSeconds("0:00:04:30")).toBe(270);
@@ -173,23 +177,26 @@ describe("computeDurations", () => {
     expect(flatNoInc[0].duration).toBe(5);
   });
 
-  test("daily games with day-prefixed clocks use actual elapsed time", () => {
-    const dailyPgn = `[Event "Daily Game"]
-[White "kr_cz"]
-[Black "opponent"]
+  test("daily games use scaled per-move durations instead of countdown deltas", () => {
+    const dailyPgn = `[Event "Let's Play!"]
+[White "BrunoAFM"]
+[Black "kr_cz"]
 [TimeControl "1/259200"]
 
-1. e4 {[%clk 2:23:55:00]} e5 {[%clk 2:23:58:30]} 2. Nf3 {[%clk 2:23:51:00]} Nc6 {[%clk 2:23:49:30]} *
+1. e4 {[%clk 0:05:22.7]} 1... e5 {[%clk 1:01:57.5]} 2. d3 {[%clk 0:47:56.2]} 2... Nf6 {[%clk 0:19:35.1]} *
 `;
 
     const parsedMoves = parseMovesWithClocks(dailyPgn);
     const { initial, increment } = parseTimeControl("1/259200");
-    const flat = computeDurations(parsedMoves, initial, increment);
+    const flat = computeDurations(parsedMoves, initial, increment, { isDaily: true });
 
-    expect(flat[0].duration).toBe(300);
-    expect(flat[1].duration).toBe(90);
-    expect(flat[2].duration).toBe(240);
-    expect(flat[3].duration).toBe(540);
+    expect(flat[0].duration).toBeCloseTo(3227);
+    expect(flat[1].duration).toBeCloseTo(37175);
+    expect(flat[2].duration).toBeCloseTo(28762);
+    expect(flat[3].duration).toBeCloseTo(11751);
+
+    expect(fmtSeconds(flat[0].duration)).toBe("53:47");
+    expect(fmtSeconds(flat[1].duration)).toBe("10:19:35");
   });
 });
 
