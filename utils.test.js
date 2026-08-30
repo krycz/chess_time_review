@@ -2,6 +2,7 @@
 const {
   parseClockToSeconds,
   parseTimeControl,
+  isDailyTimeControl,
   parseMovesWithClocks,
   computeDurations,
   durationToBarPercent,
@@ -49,6 +50,13 @@ describe("parseClockToSeconds", () => {
 // parseTimeControl
 // ---------------------------------------------------------------------------
 describe("parseTimeControl", () => {
+  test("detects chess.com daily time controls", () => {
+    expect(isDailyTimeControl("1/259200")).toBe(true);
+    expect(isDailyTimeControl("1/43200")).toBe(true);
+    expect(isDailyTimeControl("40/9000")).toBe(false);
+    expect(isDailyTimeControl("900+10")).toBe(false);
+  });
+
   test("plain seconds", () => {
     expect(parseTimeControl("600")).toEqual({ initial: 600, increment: 0 });
   });

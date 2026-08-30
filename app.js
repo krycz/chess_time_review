@@ -287,8 +287,7 @@ async function onGameSelectChange() {
   const timeControl = getPgnTag(pgn, "TimeControl") || game.time_control || null;
   const { initial, increment } = parseTimeControl(timeControl);
   initialTimeSeconds = initial;
-  const isDailyClockEncoding = game.time_class === "daily"
-    || (typeof timeControl === "string" && /^1\/\d+$/.test(timeControl));
+  const isDailyClockEncoding = game.time_class === "daily" || isDailyTimeControl(timeControl);
   // compute flat moves
   flatMoves = computeDurations(parsedMoves, initialTimeSeconds, increment, {
     isDaily: isDailyClockEncoding,
