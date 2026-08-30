@@ -61,8 +61,8 @@ function isDailyTimeControl(tc) {
 
 function parseTimeControl(tc) {
   if (!tc) return { initial: null, increment: 0 };
-  // Daily format like "1/259200" (moves-per-period / seconds)
-  if (isDailyTimeControl(tc)) {
+  // Generic moves-per-period / seconds format such as "1/259200".
+  if (tc.indexOf("/") > -1) {
     const [, secondsStr] = tc.split("/");
     const seconds = parseInt(secondsStr, 10);
     return { initial: Number.isFinite(seconds) ? seconds : null, increment: 0 };
@@ -203,11 +203,10 @@ function parseMovesWithClocks(pgn) {
 // Any residual negative value (e.g. due to lag compensation or rounding in the
 // source data) is clamped to 0 so displayed durations are always non-negative.
 //
-// Chess.com daily/correspondence PGNs are different: their %clk values appear to
-// encode per-move elapsed time in tenths of the UI value. For example, a PGN
-// value of 0:05:22.7 lines up with a UI move time of about 53:47. For those
-// games, use duration = %clk * 10 rather than treating %clk as remaining time
-// on a countdown clock.
+// Chess.com daily/correspondence PGNs are different: in the regression sample
+// covered by utils.test.js, a PGN %clk value of 0:05:22.7 aligns with a UI move
+// time of 53:47. For those games, use duration = %clk * 10 rather than treating
+// %clk as remaining time on a countdown clock.
 //
 // Returns flattened array of moves in order (index starting 0) with {index, ply, color, san, clkAfter, duration}
 function computeDurations(parsedMoves, initialTime, increment, opts) {
