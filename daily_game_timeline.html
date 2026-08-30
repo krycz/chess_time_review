@@ -290,7 +290,8 @@
         const dateTag = getPgnTag(pgn, "Date");      // e.g. "2024.05.01"
         const startTag = getPgnTag(pgn, "StartTime");// e.g. "09:25:00"
         if (dateTag && startTag) {
-          const iso = dateTag.replace(/\./g, "-") + "T" + startTag + "Z";
+          // The StartTime tag is in local time, not UTC — parse without "Z"
+          const iso = dateTag.replace(/\./g, "-") + "T" + startTag;
           const ts = Math.floor(Date.parse(iso) / 1000);
           if (!isNaN(ts)) return ts;
         }
@@ -368,7 +369,7 @@
         label.className = "axis-tick";
         label.style.left = pct + "%";
         label.style.bottom = "6px";
-        label.textContent = `${hh}:${mm}`;
+        label.textContent = `${String(hh).padStart(2, "0")}:${mm}`;
         axisEl.appendChild(label);
 
         const tick = document.createElement("div");
@@ -413,7 +414,12 @@
         // Game bars
         byDate[dateKey].forEach(d => {
           const { game, start, end } = d;
-          const leftPct = toPercent(start);
+          // For games that span midnight the start second-of-day > end second-of-day.
+          // In that case clamp the start to the axis left edge so the bar still renders.
+          const startSod = toSecOfDay(start);
+          const endSod   = toSecOfDay(end);
+          const adjustedStart = startSod > endSod ? start - startSod : start;
+          const leftPct = toPercent(adjustedStart);
           const rightPct = toPercent(end);
           const widthPct = Math.max(0.3, rightPct - leftPct);
 
