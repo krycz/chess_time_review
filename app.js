@@ -287,9 +287,11 @@ async function onGameSelectChange() {
   const timeControl = getPgnTag(pgn, "TimeControl") || game.time_control || null;
   const { initial, increment } = parseTimeControl(timeControl);
   initialTimeSeconds = initial;
+  const isDailyClockEncoding = game.time_class === "daily"
+    || (typeof timeControl === "string" && /^1\/\d+$/.test(timeControl) && initialTimeSeconds >= 86400);
   // compute flat moves
   flatMoves = computeDurations(parsedMoves, initialTimeSeconds, increment, {
-    isDaily: game.time_class === "daily" || (typeof timeControl === "string" && timeControl.indexOf("/") > -1),
+    isDaily: isDailyClockEncoding,
   });
   // Build move SAN list (flatten SANs in order) to feed chess.js
   moveSanList = [];
