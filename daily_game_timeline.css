@@ -101,7 +101,8 @@
   box-sizing: border-box;
 }
 
-.game-bar:hover {
+.game-bar:hover,
+.game-bar:focus-visible {
   opacity: 1;
   outline: 2px solid #005fcc;
   z-index: 10;
