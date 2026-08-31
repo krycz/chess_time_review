@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-C0NQHLVE3C"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-C0NQHLVE3C');
+  </script>
+
+  <meta charset="utf-8" />
+  <title>Chess.com Daily Game Timeline</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="daily_game_timeline.css" />
+</head>
+<body>
+  <div class="title-row">
+    <h1>Daily Game Timeline</h1>
+    <div class="controls-input-group title-row-controls">
+      <input id="username" type="text" aria-label="Chess.com username" placeholder="chess.com username" value="" />
+      <button id="loadGamesBtn"><span class="btn-full">Load recent games</span><span class="btn-short">Load</span></button>
+    </div>
+  </div>
+  <div class="controls-stack">
+    <span id="status" class="small"></span>
+  </div>
+
+  <div class="legend">
+    <span class="legend-item"><span class="legend-swatch" style="background:#3aaa5e"></span>Win</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#d94040"></span>Loss</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#e0a020"></span>Draw</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#2b9cff"></span>Unknown</span>
+  </div>
+
+  <div id="timeline-empty" style="display:none">No daily games found in recent archives.</div>
+
+  <div class="timeline-container">
+    <div id="timelineChart" class="timeline-chart" style="display:none"></div>
+  </div>
+
+  <div id="gameTooltip" class="game-tooltip"></div>
+
+  <script src="utils.js"></script>
+  <script src="daily_game_timeline.js"></script>
+</body>
+</html>
