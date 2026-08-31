@@ -41,10 +41,9 @@ function getOutcomeClass(game, username) {
 //   https://www.chess.com/game/daily/12345678
 // The URL is usually in the PGN [Link "..."] tag, falling back to constructing from game.url.
 function getGameUrl(game) {
-  if (game.url) return game.url;
   const pgn = game.pgn || "";
   const m = pgn.match(/\[Link\s+"([^"]+)"\]/);
-  return m ? m[1] : null;
+  return (m && m[1]) || game.url || null;
 }
 
 // ── Gantt rendering ──────────────────────────────────────────────────────
