@@ -1,0 +1,166 @@
+/* Timeline-specific styles */
+.timeline-container {
+  margin-top: 16px;
+  overflow-x: auto;
+}
+
+.timeline-header {
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.timeline-chart {
+  position: relative;
+  min-width: 600px;
+}
+
+/* axis row */
+.timeline-axis {
+  display: flex;
+  border-bottom: 1px solid #ccc;
+  height: 28px;
+  position: relative;
+  margin-left: 120px;
+  margin-bottom: 4px;
+}
+
+.axis-tick {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  color: #666;
+  white-space: nowrap;
+}
+
+.axis-tick-line {
+  position: absolute;
+  bottom: 0;
+  width: 1px;
+  height: 6px;
+  background: #bbb;
+  transform: translateX(-50%);
+}
+
+/* rows */
+.timeline-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.timeline-row {
+  display: flex;
+  align-items: center;
+  height: 30px;
+}
+
+.row-label {
+  width: 120px;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 8px;
+  text-align: right;
+}
+
+.row-track {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* grid lines (injected via JS) */
+.grid-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #efefef;
+  pointer-events: none;
+}
+
+/* game bar */
+.game-bar {
+  position: absolute;
+  top: 4px;
+  height: 22px;
+  border-radius: 4px;
+  background: #2b9cff;
+  opacity: 0.85;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  min-width: 3px;
+  box-sizing: border-box;
+}
+
+.game-bar:hover {
+  opacity: 1;
+  outline: 2px solid #005fcc;
+  z-index: 10;
+}
+
+.game-bar-label {
+  font-size: 0.7rem;
+  color: #fff;
+  white-space: nowrap;
+  padding: 0 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+/* outcome colours */
+.game-bar-win  { background: #3aaa5e; }
+.game-bar-loss { background: #d94040; }
+.game-bar-draw { background: #e0a020; }
+
+/* tooltip */
+.game-tooltip {
+  display: none;
+  position: fixed;
+  background: rgba(0,0,0,0.82);
+  color: #fff;
+  font-size: 0.8rem;
+  padding: 7px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 100;
+  max-width: 260px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+#timeline-empty {
+  color: #777;
+  font-size: 0.95rem;
+  margin-top: 12px;
+}
