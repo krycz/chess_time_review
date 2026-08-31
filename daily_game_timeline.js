@@ -297,7 +297,8 @@ async function loadArchivesForUser(username) {
 
     buildTimeline(loadedGames, username);
   } catch (err) {
-    el("status").textContent = "Error: " + err.message;
+    const msg = err instanceof Error ? err.message : String(err);
+    el("status").textContent = "Error: " + msg;
   }
 }
 
