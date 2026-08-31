@@ -234,7 +234,7 @@ function buildTimeline(games, username) {
       bar.appendChild(barLabel);
 
       // Tooltip
-      bar.addEventListener("mouseenter", (e) => {
+      function showTooltipAt(x, y) {
         const startLocal = new Date(start * 1000).toLocaleString();
         const endLocal   = new Date(end   * 1000).toLocaleString();
         const durStr = fmtSeconds(durSec);
@@ -246,11 +246,24 @@ function buildTimeline(games, username) {
           `Duration: ${durStr}`,
           outcomeLabel,
         ].join("\n");
+        tooltip.style.left = (x + 14) + "px";
+        tooltip.style.top  = (y + 14) + "px";
         tooltip.style.display = "block";
+      }
+
+      bar.addEventListener("mouseenter", (e) => {
+        showTooltipAt(e.clientX, e.clientY);
       });
       bar.addEventListener("mousemove", (e) => {
         tooltip.style.left = (e.clientX + 14) + "px";
         tooltip.style.top  = (e.clientY + 14) + "px";
+      });
+      bar.addEventListener("focus", () => {
+        const r = bar.getBoundingClientRect();
+        showTooltipAt(r.right, r.top);
+      });
+      bar.addEventListener("blur", () => {
+        tooltip.style.display = "none";
       });
       bar.addEventListener("mouseleave", () => {
         tooltip.style.display = "none";
