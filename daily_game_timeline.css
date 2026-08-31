@@ -1,7 +1,6 @@
 /* Timeline-specific styles */
 .timeline-container {
   margin-top: 16px;
-  overflow-x: auto;
 }
 
 .timeline-header {
@@ -12,16 +11,50 @@
 
 .timeline-chart {
   position: relative;
-  min-width: 600px;
+  min-width: 300px;
+}
+
+/* nav bar */
+.timeline-nav {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.tl-nav-btn {
+  padding: 3px 11px;
+  font-size: 1rem;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  background: #f5f5f5;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.tl-nav-btn:hover {
+  background: #e0e0e0;
+}
+
+/* scrollable viewport — clips the chart area */
+.timeline-viewport {
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.timeline-viewport:active {
+  cursor: grabbing;
 }
 
 /* axis row */
 .timeline-axis {
-  display: flex;
   border-bottom: 1px solid #ccc;
   height: 28px;
   position: relative;
-  margin-left: 120px;
   margin-bottom: 4px;
 }
 
@@ -46,31 +79,13 @@
 .timeline-rows {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
+  padding: 4px 0;
 }
 
 .timeline-row {
-  display: flex;
-  align-items: center;
-  height: 30px;
-}
-
-.row-label {
-  width: 120px;
-  flex-shrink: 0;
-  font-size: 0.78rem;
-  color: #555;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding-right: 8px;
-  text-align: right;
-}
-
-.row-track {
-  flex: 1;
   position: relative;
-  height: 100%;
+  height: 30px;
   border-bottom: 1px solid #f0f0f0;
 }
 

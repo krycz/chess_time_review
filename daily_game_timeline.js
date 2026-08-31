@@ -63,24 +63,19 @@ function buildTimeline(games, username) {
   chart.style.display = "";
   chart.innerHTML = "";
 
-  // Games with both start_time and end_time
+  // Games with end_time
   const dated = daily.filter(g => g.end_time);
-  // Estimate start_time: chess.com API provides end_time; start_time may or may not be present.
-  // Use start_time if available, otherwise fall back to end_time minus a nominal duration.
-  // The PGN [Date "..."] + [StartTime "..."] tags can also give start datetime.
+
   function getStartTime(g) {
     if (g.start_time) return g.start_time;
-    // Try PGN tags
     const pgn = g.pgn || "";
-    const dateTag = getPgnTag(pgn, "Date");      // e.g. "2024.05.01"
-    const startTag = getPgnTag(pgn, "StartTime");// e.g. "09:25:00"
+    const dateTag = getPgnTag(pgn, "Date");
+    const startTag = getPgnTag(pgn, "StartTime");
     if (dateTag && startTag) {
-      // The StartTime tag is in local time, not UTC — parse without "Z"
       const iso = dateTag.replace(/\./g, "-") + "T" + startTag;
       const ts = Math.floor(Date.parse(iso) / 1000);
       if (!isNaN(ts)) return ts;
     }
-    // Fall back: estimate start as end_time minus 1 day (daily games can last up to days)
     return g.end_time - 86400;
   }
 
@@ -96,144 +91,171 @@ function buildTimeline(games, username) {
     return;
   }
 
-  // Group by calendar date of end_time (local)
-  const byDate = {};
-  withTimes.forEach(d => {
-    const dt = new Date(d.end * 1000);
-    const key = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
-    (byDate[key] = byDate[key] || []).push(d);
-  });
+  // ── View state (Unix seconds) ──────────────────────────────────────────
+  // The visible window [viewStart, viewEnd] is a range of Unix timestamps.
+  // Initial view: pad slightly around the full data range.
+  const dataMin = Math.min(...withTimes.map(d => d.start));
+  const dataMax = Math.max(...withTimes.map(d => d.end));
+  const dataPad = Math.max((dataMax - dataMin) * 0.04, 3600 * 6);
 
-  // Sort dates newest first
-  const dateKeys = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+  let viewStart = dataMin - dataPad;
+  let viewEnd   = dataMax + dataPad;
 
-  // Determine global time range in seconds-of-day [0, 86400]
-  // We map each game to its fractional second-of-day for start and end using local time.
-  function toSecOfDay(ts) {
-    const d = new Date(ts * 1000);
-    return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+  // ── Helpers ────────────────────────────────────────────────────────────
+  function viewSpan() { return viewEnd - viewStart || 1; }
+
+  // Convert a Unix timestamp to a CSS left-percentage within the current view.
+  function toPct(ts) {
+    return ((ts - viewStart) / viewSpan()) * 100;
   }
 
-  // Compute the actual extent across all games so we can zoom the axis
-  let minSec = Infinity, maxSec = -Infinity;
-  withTimes.forEach(d => {
-    const s = toSecOfDay(d.start);
-    const e = toSecOfDay(d.end);
-    minSec = Math.min(minSec, s, e);
-    maxSec = Math.max(maxSec, s, e);
-  });
-  // pad a little
-  minSec = Math.max(0, minSec - 1800);
-  maxSec = Math.min(86400, maxSec + 1800);
-  const spanSec = maxSec - minSec || 1;
+  // ── Root elements ──────────────────────────────────────────────────────
+  // Nav bar (prev / zoom out / zoom in / next)
+  const navBar = document.createElement("div");
+  navBar.className = "timeline-nav";
+  navBar.innerHTML = `
+    <button class="tl-nav-btn" id="tl-prev" title="Pan left">&#8592;</button>
+    <button class="tl-nav-btn" id="tl-zoom-out" title="Zoom out">&#8722;</button>
+    <button class="tl-nav-btn" id="tl-zoom-in" title="Zoom in">+</button>
+    <button class="tl-nav-btn" id="tl-next" title="Pan right">&#8594;</button>
+  `;
+  chart.appendChild(navBar);
 
-  function toPercent(ts) {
-    const sod = toSecOfDay(ts);
-    return Math.max(0, Math.min(100, ((sod - minSec) / spanSec) * 100));
-  }
+  // Scrollable viewport
+  const viewport = document.createElement("div");
+  viewport.className = "timeline-viewport";
+  chart.appendChild(viewport);
 
-  // ── Axis ──────────────────────────────────────────────────────────────
+  // Axis
   const axisEl = document.createElement("div");
   axisEl.className = "timeline-axis";
+  viewport.appendChild(axisEl);
 
-  // Pick a reasonable tick interval (in seconds)
-  const tickIntervals = [900, 1800, 3600, 7200];
-  let tickInterval = 3600;
-  for (const t of tickIntervals) {
-    if (spanSec / t <= 24) { tickInterval = t; break; }
-  }
-
-  const tickPositions = [];
-  const firstTick = Math.ceil(minSec / tickInterval) * tickInterval;
-  for (let t = firstTick; t <= maxSec; t += tickInterval) {
-    tickPositions.push(t);
-    const pct = ((t - minSec) / spanSec) * 100;
-    const hh = Math.floor(t / 3600) % 24;
-    const mm = String(Math.floor((t % 3600) / 60)).padStart(2, "0");
-    const label = document.createElement("div");
-    label.className = "axis-tick";
-    label.style.left = pct + "%";
-    label.style.bottom = "6px";
-    label.textContent = `${String(hh).padStart(2, "0")}:${mm}`;
-    axisEl.appendChild(label);
-
-    const tick = document.createElement("div");
-    tick.className = "axis-tick-line";
-    tick.style.left = pct + "%";
-    axisEl.appendChild(tick);
-  }
-  chart.appendChild(axisEl);
-
-  // ── Rows ──────────────────────────────────────────────────────────────
+  // Rows container
   const rowsEl = document.createElement("div");
   rowsEl.className = "timeline-rows";
+  viewport.appendChild(rowsEl);
 
+  // Tooltip
   const tooltip = el("gameTooltip");
 
-  dateKeys.forEach(dateKey => {
-    const row = document.createElement("div");
-    row.className = "timeline-row";
+  // ── Build game rows ────────────────────────────────────────────────────
+  // Each game gets its own row so overlapping games are still distinguishable.
+  // Sort newest-end-time first.
+  const sorted = [...withTimes].sort((a, b) => b.end - a.end);
 
-    // Label
-    const label = document.createElement("div");
-    label.className = "row-label";
-    // Format as "Mon 1 May"
-    const [yr, mo, dy] = dateKey.split("-").map(Number);
-    const labelDate = new Date(yr, mo - 1, dy);
-    label.textContent = labelDate.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-    label.title = dateKey;
-    row.appendChild(label);
+  const rowData = sorted.map(d => {
+    const { game, start, end } = d;
+    const outcome = getOutcomeClass(game, username);
+    const opponent = getGamePlayerName(
+      (username || "").trim().toLowerCase() === getGamePlayerName(game.white, "").toLowerCase()
+        ? game.black : game.white,
+      "?"
+    );
+    const durSec = end - start;
+    const gameUrl = getGameUrl(game);
+    return { game, start, end, outcome, opponent, durSec, gameUrl };
+  });
 
-    // Track
-    const track = document.createElement("div");
-    track.className = "row-track";
+  // ── Render function ────────────────────────────────────────────────────
+  function render() {
+    const span = viewSpan();
 
-    // Grid lines
-    tickPositions.forEach(t => {
-      const gl = document.createElement("div");
-      gl.className = "grid-line";
-      gl.style.left = ((t - minSec) / spanSec * 100) + "%";
-      track.appendChild(gl);
-    });
+    // ── Axis ticks ──────────────────────────────────────────────────────
+    axisEl.innerHTML = "";
 
-    // Game bars
-    byDate[dateKey].forEach(d => {
-      const { game, start, end } = d;
-      // For games that span midnight the start second-of-day > end second-of-day.
-      // In that case clamp the start to the axis left edge so the bar still renders.
-      const startSod = toSecOfDay(start);
-      const endSod   = toSecOfDay(end);
-      const adjustedStart = startSod > endSod ? start - startSod : start;
-      const leftPct = toPercent(adjustedStart);
-      const rightPct = toPercent(end);
+    // Choose a tick interval based on the visible span.
+    // Aim for roughly 6–12 ticks across the view.
+    const TARGET_TICKS = 9;
+    const rawInterval = span / TARGET_TICKS;
+    // Candidate intervals: 1h, 2h, 4h, 6h, 12h, 1d, 2d, 3d, 7d, 14d, 30d
+    const CANDIDATES = [
+      3600, 7200, 14400, 21600, 43200,
+      86400, 172800, 259200, 604800, 1209600, 2592000,
+    ];
+    let tickInterval = CANDIDATES[CANDIDATES.length - 1];
+    for (const c of CANDIDATES) {
+      if (c >= rawInterval) { tickInterval = c; break; }
+    }
+
+    // Snap the first tick to a clean boundary.
+    // For sub-day intervals, snap to midnight + N * interval.
+    // For multi-day intervals, snap to start-of-day.
+    const firstTickRaw = Math.ceil(viewStart / tickInterval) * tickInterval;
+    // Snap to a clean clock boundary aligned to midnight local time.
+    const midnightOffset = new Date(firstTickRaw * 1000);
+    midnightOffset.setHours(0, 0, 0, 0);
+    const midnightTs = midnightOffset.getTime() / 1000;
+    const firstTick = midnightTs + Math.ceil((firstTickRaw - midnightTs) / tickInterval) * tickInterval;
+
+    for (let t = firstTick; t <= viewEnd + tickInterval; t += tickInterval) {
+      const pct = toPct(t);
+      if (pct < -5 || pct > 105) continue;
+
+      const d = new Date(t * 1000);
+      let label;
+      if (tickInterval < 86400) {
+        // Show date + time for sub-day ticks
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        const mon = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        label = d.getHours() === 0 && d.getMinutes() === 0 ? mon : `${hh}:${mm}`;
+      } else {
+        label = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      }
+
+      const tickEl = document.createElement("div");
+      tickEl.className = "axis-tick";
+      tickEl.style.left = pct + "%";
+      tickEl.textContent = label;
+      axisEl.appendChild(tickEl);
+
+      const tickLine = document.createElement("div");
+      tickLine.className = "axis-tick-line";
+      tickLine.style.left = pct + "%";
+      axisEl.appendChild(tickLine);
+    }
+
+    // ── Rows ────────────────────────────────────────────────────────────
+    rowsEl.innerHTML = "";
+
+    rowData.forEach(({ game, start, end, outcome, opponent, durSec, gameUrl }) => {
+      const leftPct  = toPct(start);
+      const rightPct = toPct(end);
       const widthPct = Math.max(0.3, rightPct - leftPct);
 
-      const outcome = getOutcomeClass(game, username);
+      // Skip bars that are entirely outside the view
+      if (rightPct < -1 || leftPct > 101) return;
+
+      const row = document.createElement("div");
+      row.className = "timeline-row";
+
+      // Grid lines for this row (reuse same tick positions)
+      for (let t = firstTick; t <= viewEnd + tickInterval; t += tickInterval) {
+        const pct = toPct(t);
+        if (pct < -1 || pct > 101) continue;
+        const gl = document.createElement("div");
+        gl.className = "grid-line";
+        gl.style.left = pct + "%";
+        row.appendChild(gl);
+      }
+
       const bar = document.createElement("a");
       bar.className = `game-bar game-bar-${outcome}`;
       bar.style.left = leftPct + "%";
       bar.style.width = widthPct + "%";
 
-      const gameUrl = getGameUrl(game);
       if (gameUrl) {
         bar.href = gameUrl;
         bar.target = "_blank";
         bar.rel = "noopener noreferrer";
       }
 
-      // Bar inner label
-      const durSec = end - start;
       const barLabel = document.createElement("span");
       barLabel.className = "game-bar-label";
-      const opponent = getGamePlayerName(
-        (username || "").trim().toLowerCase() === getGamePlayerName(game.white, "").toLowerCase()
-          ? game.black : game.white,
-        "?"
-      );
       barLabel.textContent = `vs ${opponent}`;
       bar.appendChild(barLabel);
 
-      // Tooltip
       function showTooltipAt(x, y) {
         const startLocal = new Date(start * 1000).toLocaleString();
         const endLocal   = new Date(end   * 1000).toLocaleString();
@@ -251,10 +273,8 @@ function buildTimeline(games, username) {
         tooltip.style.display = "block";
       }
 
-      bar.addEventListener("mouseenter", (e) => {
-        showTooltipAt(e.clientX, e.clientY);
-      });
-      bar.addEventListener("mousemove", (e) => {
+      bar.addEventListener("mouseenter", e => showTooltipAt(e.clientX, e.clientY));
+      bar.addEventListener("mousemove",  e => {
         tooltip.style.left = (e.clientX + 14) + "px";
         tooltip.style.top  = (e.clientY + 14) + "px";
       });
@@ -262,21 +282,133 @@ function buildTimeline(games, username) {
         const r = bar.getBoundingClientRect();
         showTooltipAt(r.right, r.top);
       });
-      bar.addEventListener("blur", () => {
-        tooltip.style.display = "none";
-      });
-      bar.addEventListener("mouseleave", () => {
-        tooltip.style.display = "none";
-      });
+      bar.addEventListener("blur",       () => { tooltip.style.display = "none"; });
+      bar.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
 
-      track.appendChild(bar);
+      row.appendChild(bar);
+      rowsEl.appendChild(row);
     });
+  }
 
-    row.appendChild(track);
-    rowsEl.appendChild(row);
+  // ── Zoom & pan helpers ─────────────────────────────────────────────────
+  function clampView() {
+    const minSpan = 3600 * 2;   // 2 hours minimum zoom
+    const maxSpan = (dataMax - dataMin + 2 * dataPad) * 2;
+    if (viewEnd - viewStart < minSpan) {
+      const mid = (viewStart + viewEnd) / 2;
+      viewStart = mid - minSpan / 2;
+      viewEnd   = mid + minSpan / 2;
+    }
+    if (viewEnd - viewStart > maxSpan) {
+      const mid = (viewStart + viewEnd) / 2;
+      viewStart = mid - maxSpan / 2;
+      viewEnd   = mid + maxSpan / 2;
+    }
+  }
+
+  function zoom(factor, pivotTs) {
+    // factor < 1 → zoom in; factor > 1 → zoom out
+    const pivot = pivotTs !== undefined ? pivotTs : (viewStart + viewEnd) / 2;
+    viewStart = pivot - (pivot - viewStart) * factor;
+    viewEnd   = pivot + (viewEnd   - pivot) * factor;
+    clampView();
+    render();
+  }
+
+  function pan(fraction) {
+    const delta = viewSpan() * fraction;
+    viewStart += delta;
+    viewEnd   += delta;
+    render();
+  }
+
+  // ── Nav buttons ────────────────────────────────────────────────────────
+  navBar.querySelector("#tl-prev").addEventListener("click",     () => pan(-0.3));
+  navBar.querySelector("#tl-next").addEventListener("click",     () => pan(+0.3));
+  navBar.querySelector("#tl-zoom-in").addEventListener("click",  () => zoom(0.6));
+  navBar.querySelector("#tl-zoom-out").addEventListener("click", () => zoom(1.6));
+
+  // ── Mouse wheel zoom ───────────────────────────────────────────────────
+  viewport.addEventListener("wheel", e => {
+    e.preventDefault();
+    const rect = viewport.getBoundingClientRect();
+    const frac = (e.clientX - rect.left) / rect.width;
+    const pivotTs = viewStart + frac * viewSpan();
+    const factor = e.deltaY > 0 ? 1.25 : 0.8;
+    zoom(factor, pivotTs);
+  }, { passive: false });
+
+  // ── Drag to pan ────────────────────────────────────────────────────────
+  let dragStartX = null;
+  let dragStartViewStart = null;
+  let dragStartViewEnd = null;
+
+  viewport.addEventListener("mousedown", e => {
+    if (e.button !== 0) return;
+    dragStartX = e.clientX;
+    dragStartViewStart = viewStart;
+    dragStartViewEnd   = viewEnd;
+    viewport.style.cursor = "grabbing";
   });
 
-  chart.appendChild(rowsEl);
+  function onWindowMouseMove(e) {
+    if (dragStartX === null) return;
+    const rect = viewport.getBoundingClientRect();
+    const dx = e.clientX - dragStartX;
+    const span = dragStartViewEnd - dragStartViewStart;
+    const delta = -(dx / rect.width) * span;
+    viewStart = dragStartViewStart + delta;
+    viewEnd   = dragStartViewEnd   + delta;
+    render();
+  }
+
+  function onWindowMouseUp() {
+    if (dragStartX === null) return;
+    dragStartX = null;
+    viewport.style.cursor = "";
+  }
+
+  window.addEventListener("mousemove", onWindowMouseMove);
+  window.addEventListener("mouseup",   onWindowMouseUp);
+
+  // Clean up window listeners when the chart is rebuilt (loadGamesBtn re-calls buildTimeline).
+  // Use a MutationObserver to detect when the chart element is emptied/replaced.
+  const cleanupObserver = new MutationObserver(() => {
+    if (!chart.contains(viewport)) {
+      window.removeEventListener("mousemove", onWindowMouseMove);
+      window.removeEventListener("mouseup",   onWindowMouseUp);
+      cleanupObserver.disconnect();
+    }
+  });
+  cleanupObserver.observe(chart, { childList: true });
+
+  // ── Touch pan ──────────────────────────────────────────────────────────
+  let touchStartX = null;
+  let touchViewStart = null;
+  let touchViewEnd = null;
+
+  viewport.addEventListener("touchstart", e => {
+    if (e.touches.length !== 1) return;
+    touchStartX = e.touches[0].clientX;
+    touchViewStart = viewStart;
+    touchViewEnd   = viewEnd;
+  }, { passive: true });
+
+  viewport.addEventListener("touchmove", e => {
+    if (touchStartX === null || e.touches.length !== 1) return;
+    const rect = viewport.getBoundingClientRect();
+    const dx = e.touches[0].clientX - touchStartX;
+    const span = touchViewEnd - touchViewStart;
+    const delta = -(dx / rect.width) * span;
+    viewStart = touchViewStart + delta;
+    viewEnd   = touchViewEnd   + delta;
+    render();
+  }, { passive: true });
+
+  viewport.addEventListener("touchend", () => { touchStartX = null; }, { passive: true });
+
+  // ── Initial render ─────────────────────────────────────────────────────
+  render();
 }
 
 // ── Load games ───────────────────────────────────────────────────────────
