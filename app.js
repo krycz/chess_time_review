@@ -288,7 +288,9 @@ async function onGameSelectChange() {
   const { initial, increment } = parseTimeControl(timeControl);
   initialTimeSeconds = initial;
   // compute flat moves
-  flatMoves = computeDurations(parsedMoves, initialTimeSeconds, increment);
+  flatMoves = computeDurations(parsedMoves, initialTimeSeconds, increment, {
+    isDaily: game.time_class === "daily",
+  });
   // Build move SAN list (flatten SANs in order) to feed chess.js
   moveSanList = [];
   parsedMoves.forEach((m) => {

@@ -36,13 +36,17 @@ function fmtSeconds(s) {
   return String(mm).padStart(1, "0") + ":" + String(ss).padStart(2, "0");
 }
 
-// Parse clock "H:MM:SS" or "MM:SS" to seconds
+// Parse clock "D:HH:MM:SS", "H:MM:SS", "MM:SS" or "SS.s" to seconds.
 function parseClockToSeconds(s) {
   if (!s) return null;
-  const parts = s.split(":").map((p) => parseInt(p, 10));
+  const rawParts = s.split(":");
+  if (rawParts.some((part) => part === "")) return null;
+  const parts = rawParts.map((p) => Number(p));
+  if (parts.some((part) => !Number.isFinite(part))) return null;
+  if (parts.length === 4) return parts[0] * 86400 + parts[1] * 3600 + parts[2] * 60 + parts[3];
   if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
   if (parts.length === 2) return parts[0] * 60 + parts[1];
-  return parseInt(parts[0] || 0, 10);
+  return parts[0] || 0;
 }
 
 // Parse a chess.com/PGN TimeControl string into { initial, increment } in seconds.
@@ -53,7 +57,7 @@ function parseClockToSeconds(s) {
 // Returns { initial: number|null, increment: number }
 function parseTimeControl(tc) {
   if (!tc) return { initial: null, increment: 0 };
-  // Daily format like "1/259200" (moves-per-period / seconds)
+  // Generic moves-per-period / seconds format such as "1/259200".
   if (tc.indexOf("/") > -1) {
     const [, secondsStr] = tc.split("/");
     const seconds = parseInt(secondsStr, 10);
@@ -195,9 +199,19 @@ function parseMovesWithClocks(pgn) {
 // Any residual negative value (e.g. due to lag compensation or rounding in the
 // source data) is clamped to 0 so displayed durations are always non-negative.
 //
+// Chess.com daily/correspondence PGNs are different: multiple moves in the
+// regression sample covered by utils.test.js line up with the Chess.com UI when
+// %clk is treated as tenths of the displayed move duration (for example,
+// 0:05:22.7 -> 53:47 and 1:01:57.5 -> 10:19:35). This is an empirical
+// chess.com-specific heuristic, not a documented PGN standard. For those games,
+// use duration = %clk * 10 rather than treating %clk as remaining time on a
+// countdown clock.
+//
 // Returns flattened array of moves in order (index starting 0) with {index, ply, color, san, clkAfter, duration}
-function computeDurations(parsedMoves, initialTime, increment) {
+function computeDurations(parsedMoves, initialTime, increment, opts) {
   const inc = increment || 0;
+  const options = opts || {};
+  const useDailyDurationEncoding = Boolean(options.isDaily);
   const result = [];
   // Keep previous clock by color
   let prevClock = {
@@ -211,7 +225,9 @@ function computeDurations(parsedMoves, initialTime, increment) {
     if (w && w.san) {
       const after = w.clk;
       let dur = null;
-      if (after != null && prevClock.w != null) {
+      if (after != null && useDailyDurationEncoding) {
+        dur = after * 10;
+      } else if (after != null && prevClock.w != null) {
         dur = prevClock.w + inc - after;
         if (dur < 0) dur = 0;
       }
@@ -225,7 +241,9 @@ function computeDurations(parsedMoves, initialTime, increment) {
     if (b && b.san) {
       const after = b.clk;
       let dur = null;
-      if (after != null && prevClock.b != null) {
+      if (after != null && useDailyDurationEncoding) {
+        dur = after * 10;
+      } else if (after != null && prevClock.b != null) {
         dur = prevClock.b + inc - after;
         if (dur < 0) dur = 0;
       }

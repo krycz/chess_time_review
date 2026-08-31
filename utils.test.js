@@ -30,6 +30,15 @@ describe("parseClockToSeconds", () => {
     expect(parseClockToSeconds("600")).toBe(600);
   });
 
+  test("preserves fractional seconds", () => {
+    expect(parseClockToSeconds("0:05:22.7")).toBeCloseTo(322.7);
+  });
+
+  test("D:HH:MM:SS format", () => {
+    expect(parseClockToSeconds("2:23:55:00")).toBe(258900);
+    expect(parseClockToSeconds("0:00:04:30")).toBe(270);
+  });
+
   test("null / empty returns null", () => {
     expect(parseClockToSeconds(null)).toBeNull();
     expect(parseClockToSeconds("")).toBeNull();
@@ -166,6 +175,28 @@ describe("computeDurations", () => {
     const flatNoInc = computeDurations(parsedMoves, 900, 0);
     // Without increment, white move 1: 900-895=5 (not 15)
     expect(flatNoInc[0].duration).toBe(5);
+  });
+
+  test("daily games use scaled per-move durations instead of countdown deltas", () => {
+    const dailyPgn = `[Event "Let's Play!"]
+[White "BrunoAFM"]
+[Black "kr_cz"]
+[TimeControl "1/259200"]
+
+1. e4 {[%clk 0:05:22.7]} 1... e5 {[%clk 1:01:57.5]} 2. d3 {[%clk 0:47:56.2]} 2... Nf6 {[%clk 0:19:35.1]} *
+`;
+
+    const parsedMoves = parseMovesWithClocks(dailyPgn);
+    const { initial, increment } = parseTimeControl("1/259200");
+    const flat = computeDurations(parsedMoves, initial, increment, { isDaily: true });
+
+    expect(flat[0].duration).toBeCloseTo(3227); // 0:05:22.7 -> 322.7s -> 3227s
+    expect(flat[1].duration).toBeCloseTo(37175); // 1:01:57.5 -> 3717.5s -> 37175s
+    expect(flat[2].duration).toBeCloseTo(28762); // 0:47:56.2 -> 2876.2s -> 28762s
+    expect(flat[3].duration).toBeCloseTo(11751); // 0:19:35.1 -> 1175.1s -> 11751s
+
+    expect(fmtSeconds(flat[0].duration)).toBe("53:47");
+    expect(fmtSeconds(flat[1].duration)).toBe("10:19:35");
   });
 });
 
