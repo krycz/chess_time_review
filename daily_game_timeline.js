@@ -396,6 +396,7 @@ function buildTimeline(games, username) {
 
   viewport.addEventListener("touchmove", e => {
     if (touchStartX === null || e.touches.length !== 1) return;
+    e.preventDefault();
     const rect = viewport.getBoundingClientRect();
     const dx = e.touches[0].clientX - touchStartX;
     const span = touchViewEnd - touchViewStart;
@@ -403,7 +404,7 @@ function buildTimeline(games, username) {
     viewStart = touchViewStart + delta;
     viewEnd   = touchViewEnd   + delta;
     render();
-  }, { passive: true });
+  }, { passive: false });
 
   viewport.addEventListener("touchend", () => { touchStartX = null; }, { passive: true });
 
