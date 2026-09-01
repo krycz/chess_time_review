@@ -291,12 +291,13 @@ function getCurrentMonthArchiveUrl(username, date) {
 // Check if an archive list already contains an archive for the specified year and month.
 function hasArchiveForMonth(archiveUrls, year, month) {
   const monthStr = String(month).padStart(2, "0");
-  const pattern = new RegExp(`/${year}/0?${parseInt(monthStr, 10)}(?:/)?$`, "i");
+  const monthNum = parseInt(monthStr, 10);
+  const pattern = new RegExp(`/${year}/(?:${monthStr}|${monthNum})(?:/)?$`, "i");
   return (archiveUrls || []).some((url) => typeof url === "string" && pattern.test(url.trim()));
 }
 
 // Ensure that the current month's archive URL is present in the archive list.
-// If the archive list is missing the current month, append it to the end (newest-first assumption).
+// If the archive list is missing the current month, append it to the end (archive lists are oldest->newest).
 function ensureCurrentMonthArchive(archiveUrls, username, date) {
   const list = Array.isArray(archiveUrls) ? archiveUrls.slice() : [];
   const d = date instanceof Date ? date : (date ? new Date(date) : new Date());
