@@ -329,7 +329,7 @@ function ensureCurrentMonthArchive(archiveUrls, username, date) {
 // `archiveUrls` is expected oldest->newest (chess.com archives API order).
 // Stops once minGames is reached (and at least minArchives have been fetched)
 // or maxArchives have been fetched.
-// Gracefully handles empty responses and fetch/network errors (e.g. for new months with no games played yet).
+// Gracefully handles empty responses and fetch/network errors (e.g. for new months with no games played yet); `archivesLoaded` counts attempted archives.
 async function loadRecentGamesFromArchives(fetchImpl, archiveUrls, opts) {
   const options = opts || {};
   const minGames = Number.isFinite(options.minGames) ? options.minGames : 6;
