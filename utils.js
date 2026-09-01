@@ -312,7 +312,9 @@ function ensureCurrentMonthArchive(archiveUrls, username, date) {
   if (!currentMonthUrl && list.length > 0) {
     const lastUrl = list[list.length - 1];
     if (typeof lastUrl === "string") {
-      currentMonthUrl = lastUrl.trim().replace(/\/\d{4}\/\d{1,2}\/?$/, `/${year}/${month}`);
+      const trimmed = lastUrl.trim();
+      const inferred = trimmed.replace(/\/\d{4}\/\d{1,2}\/?$/, `/${year}/${month}`);
+      if (inferred !== trimmed) currentMonthUrl = inferred;
     }
   }
 
