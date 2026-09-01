@@ -187,7 +187,8 @@ async function loadArchivesForUser(username) {
     if (!res.ok) throw new Error("Could not fetch archives: " + res.status);
     const data = await res.json();
     // archives is array of URLs ordered oldest->newest
-    const archives = data.archives;
+    let archives = data.archives || [];
+    archives = ensureCurrentMonthArchive(archives, username);
     if (!archives || archives.length === 0) throw new Error("No archives found for user.");
     const { games: loadedGames, archivesLoaded } = await loadRecentGamesFromArchives(fetch, archives, {
       minGames: MIN_GAMES_TO_LOAD,

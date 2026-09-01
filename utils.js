@@ -277,10 +277,59 @@ function durationToBarPercent(duration, maxDuration, opts) {
   return startPercent + clampedRatio * (endPercent - startPercent);
 }
 
+// Build standard Chess.com monthly archive URL for a given username and date (defaults to current date).
+function getCurrentMonthArchiveUrl(username, date) {
+  const d = date instanceof Date ? date : (date ? new Date(date) : new Date());
+  if (isNaN(d.getTime())) return null;
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const cleanUsername = (username || "").trim().toLowerCase();
+  if (!cleanUsername) return null;
+  return `https://api.chess.com/pub/player/${encodeURIComponent(cleanUsername)}/games/${year}/${month}`;
+}
+
+// Check if an archive list already contains an archive for the specified year and month.
+function hasArchiveForMonth(archiveUrls, year, month) {
+  const monthStr = String(month).padStart(2, "0");
+  const pattern = new RegExp(`/${year}/${monthStr}(?:/)?$`, "i");
+  return (archiveUrls || []).some((url) => typeof url === "string" && pattern.test(url.trim()));
+}
+
+// Ensure that the current month's archive URL is present in the archive list.
+// If the archive list is missing the current month, append it to the end (archive lists are oldest->newest).
+function ensureCurrentMonthArchive(archiveUrls, username, date) {
+  const list = Array.isArray(archiveUrls) ? archiveUrls.slice() : [];
+  const d = date instanceof Date ? date : (date ? new Date(date) : new Date());
+  if (isNaN(d.getTime())) return list;
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+
+  if (hasArchiveForMonth(list, year, month)) {
+    return list;
+  }
+
+  let currentMonthUrl = getCurrentMonthArchiveUrl(username, d);
+  if (!currentMonthUrl && list.length > 0) {
+    const lastUrl = list[list.length - 1];
+    if (typeof lastUrl === "string") {
+      const trimmed = lastUrl.trim();
+      const inferred = trimmed.replace(/\/\d{4}\/\d{1,2}\/?$/, `/${year}/${month}`);
+      if (inferred !== trimmed) currentMonthUrl = inferred;
+    }
+  }
+
+  if (currentMonthUrl) {
+    list.push(currentMonthUrl);
+  }
+
+  return list;
+}
+
 // Load recent monthly archives newest-first and return enough games for the UI.
 // `archiveUrls` is expected oldest->newest (chess.com archives API order).
 // Stops once minGames is reached (and at least minArchives have been fetched)
 // or maxArchives have been fetched.
+// Gracefully handles empty responses and fetch/network errors (e.g. for new months with no games played yet); `archivesLoaded` counts attempted archives.
 async function loadRecentGamesFromArchives(fetchImpl, archiveUrls, opts) {
   const options = opts || {};
   const minGames = Number.isFinite(options.minGames) ? options.minGames : 6;
@@ -297,13 +346,19 @@ async function loadRecentGamesFromArchives(fetchImpl, archiveUrls, opts) {
 
   for (const [archiveIndex, archiveUrl] of recentArchives.entries()) {
     if (onArchiveLoadStart) onArchiveLoadStart(archiveIndex);
-    const archiveRes = await fetchFn(archiveUrl);
-    if (!archiveRes.ok) {
-      const statusText = archiveRes.statusText ? " " + archiveRes.statusText : "";
-      throw new Error("Could not fetch archive " + archiveUrl + ": " + archiveRes.status + statusText);
+    let monthGames = [];
+    try {
+      const archiveRes = await fetchFn(archiveUrl);
+      if (archiveRes && archiveRes.ok) {
+        const monthData = await archiveRes.json();
+        monthGames = monthData && Array.isArray(monthData.games) ? monthData.games : [];
+      }
+    } catch (err) {
+      if (typeof console !== "undefined" && typeof console.warn === "function") {
+        console.warn("Failed to load archive " + archiveUrl + ":", err);
+      }
+      monthGames = [];
     }
-    const monthData = await archiveRes.json();
-    const monthGames = monthData && Array.isArray(monthData.games) ? monthData.games : [];
     games.push(...monthGames);
     archivesLoaded++;
     if (games.length >= minGames && archivesLoaded >= minArchives) break;
@@ -415,6 +470,8 @@ if (typeof module !== "undefined" && module.exports) {
     computeDurations,
     durationToBarPercent,
     loadRecentGamesFromArchives,
+    getCurrentMonthArchiveUrl,
+    ensureCurrentMonthArchive,
     getCapturedPieces,
     PIECE_ORDER,
     PIECE_VALUES,
