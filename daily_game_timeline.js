@@ -1,7 +1,16 @@
 const DRAW_RESULTS = new Set(["agreed", "repetition", "stalemate", "insufficient", "50move", "timevsinsufficient"]);
 const LOSS_RESULTS = new Set(["checkmated", "resigned", "timeout", "lose", "abandoned"]);
 const MIN_GAMES_TO_LOAD = 20;
+const MIN_ARCHIVES_TO_LOAD = 3; // always load at least the last 3 months
 const MAX_ARCHIVES_TO_LOAD = 6;
+
+// ── Load-more state ────────────────────────────────────────────────────────
+// Tracks the current user's session so the "load additional month" button can
+// fetch further-back archives on demand and append them to the timeline.
+let sessionArchives = null;   // full list of archive URLs, oldest -> newest
+let sessionGames = [];        // all games loaded so far, across all archives
+let sessionArchivesLoaded = 0; // how many of the most-recent archives are loaded
+let sessionUsername = "";
 
 // ── URL helpers (mirrors app.js) ─────────────────────────────────────────
 function getUsernameFromUrl() {
@@ -413,10 +422,31 @@ function buildTimeline(games, username) {
 }
 
 // ── Load games ───────────────────────────────────────────────────────────
+function updateLoadMoreButton() {
+  const btn = el("loadMoreBtn");
+  const hasMoreArchives = !!sessionArchives &&
+    sessionArchivesLoaded < sessionArchives.length;
+  btn.style.display = hasMoreArchives ? "" : "none";
+  btn.disabled = false;
+  btn.textContent = "Load additional month";
+}
+
+function updateStatusText(archivesLoaded) {
+  const archiveWord = archivesLoaded === 1 ? "archive" : "archives";
+  const dailyCount = sessionGames.filter(g => g.time_class === "daily").length;
+  el("status").textContent =
+    `Loaded ${sessionGames.length} games (${dailyCount} daily) from ${archivesLoaded} recent ${archiveWord}.`;
+}
+
 async function loadArchivesForUser(username) {
   el("status").textContent = "Loading archives...";
   el("timelineChart").style.display = "none";
   el("timeline-empty").style.display = "none";
+  el("loadMoreBtn").style.display = "none";
+  sessionArchives = null;
+  sessionGames = [];
+  sessionArchivesLoaded = 0;
+  sessionUsername = username;
   try {
     const url = `https://api.chess.com/pub/player/${encodeURIComponent(username)}/games/archives`;
     const res = await fetch(url);
@@ -427,6 +457,7 @@ async function loadArchivesForUser(username) {
 
     const { games: loadedGames, archivesLoaded } = await loadRecentGamesFromArchives(fetch, archives, {
       minGames: MIN_GAMES_TO_LOAD,
+      minArchives: MIN_ARCHIVES_TO_LOAD,
       maxArchives: MAX_ARCHIVES_TO_LOAD,
       onArchiveLoadStart: (archiveIndex) => {
         el("status").textContent = archiveIndex === 0
@@ -435,15 +466,46 @@ async function loadArchivesForUser(username) {
       },
     });
 
-    const archiveWord = archivesLoaded === 1 ? "archive" : "archives";
-    const dailyCount = loadedGames.filter(g => g.time_class === "daily").length;
-    el("status").textContent =
-      `Loaded ${loadedGames.length} games (${dailyCount} daily) from ${archivesLoaded} recent ${archiveWord}.`;
+    sessionArchives = archives;
+    sessionGames = loadedGames;
+    sessionArchivesLoaded = archivesLoaded;
 
-    buildTimeline(loadedGames, username);
+    updateStatusText(archivesLoaded);
+    updateLoadMoreButton();
+    buildTimeline(sessionGames, username);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     el("status").textContent = "Error: " + msg;
+  }
+}
+
+async function loadAdditionalMonth() {
+  if (!sessionArchives || sessionArchivesLoaded >= sessionArchives.length) return;
+  const btn = el("loadMoreBtn");
+  btn.disabled = true;
+  btn.textContent = "Loading...";
+  el("status").textContent = "Loading previous archive...";
+  try {
+    // Archives are ordered oldest -> newest; the next one to load is the one
+    // just before the oldest archive already loaded.
+    const nextIndex = sessionArchives.length - 1 - sessionArchivesLoaded;
+    const archiveUrl = sessionArchives[nextIndex];
+    const res = await fetch(archiveUrl);
+    if (!res.ok) throw new Error("Could not fetch archive: " + res.status);
+    const monthData = await res.json();
+    const monthGames = monthData && Array.isArray(monthData.games) ? monthData.games : [];
+
+    // Merge newly loaded games into the current session; buildTimeline sorts by end time.
+    sessionGames = sessionGames.concat(monthGames);
+    sessionArchivesLoaded++;
+
+    updateStatusText(sessionArchivesLoaded);
+    updateLoadMoreButton();
+    buildTimeline(sessionGames, sessionUsername);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    el("status").textContent = "Error: " + msg;
+    updateLoadMoreButton();
   }
 }
 
@@ -453,6 +515,10 @@ el("loadGamesBtn").addEventListener("click", () => {
   if (!username) { alert("Enter a chess.com username"); return; }
   updateUsernameInUrl(username);
   loadArchivesForUser(username);
+});
+
+el("loadMoreBtn").addEventListener("click", () => {
+  loadAdditionalMonth();
 });
 
 el("username").addEventListener("keydown", (e) => {
