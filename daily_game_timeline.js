@@ -256,6 +256,12 @@ function buildTimeline(games, username) {
     rowsEl.innerHTML = "";
 
     packedRows.forEach((items) => {
+      const hasVisibleItem = items.some(({ start, end }) => {
+        const leftPct = toPct(start);
+        const rightPct = toPct(end);
+        return rightPct >= -1 && leftPct <= 101;
+      });
+      if (!hasVisibleItem) return;
       const row = document.createElement("div");
       row.className = "timeline-row";
 
