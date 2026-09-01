@@ -352,6 +352,9 @@ async function loadRecentGamesFromArchives(fetchImpl, archiveUrls, opts) {
         monthGames = monthData && Array.isArray(monthData.games) ? monthData.games : [];
       }
     } catch (err) {
+      if (typeof console !== "undefined" && typeof console.warn === "function") {
+        console.warn("Failed to load archive " + archiveUrl + ":", err);
+      }
       monthGames = [];
     }
     games.push(...monthGames);
