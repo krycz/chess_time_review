@@ -140,11 +140,13 @@ function buildTimeline(games, username) {
   const tooltip = el("gameTooltip");
 
   // ── Build game rows ────────────────────────────────────────────────────
-  // Each game gets its own row so overlapping games are still distinguishable.
-  // Sort newest-end-time first.
-  const sorted = [...withTimes].sort((a, b) => b.end - a.end);
+  // Pack intervals into rows so games with non-overlapping time ranges share a row,
+  // while overlapping games stay on separate rows to remain readable.
+  const sorted = [...withTimes].sort((a, b) => a.start - b.start);
 
-  const rowData = sorted.map(d => {
+  const rowEndTimes = [];
+  const rowData = [];
+  sorted.forEach(d => {
     const { game, start, end } = d;
     const outcome = getOutcomeClass(game, username);
     const opponent = getGamePlayerName(
@@ -154,8 +156,42 @@ function buildTimeline(games, username) {
     );
     const durSec = end - start;
     const gameUrl = getGameUrl(game);
-    return { game, start, end, outcome, opponent, durSec, gameUrl };
+
+    let rowIndex = rowEndTimes.findIndex(rowEnd => rowEnd <= start);
+    if (rowIndex === -1) {
+      rowIndex = rowEndTimes.length;
+      rowEndTimes.push(end);
+    } else {
+      rowEndTimes[rowIndex] = end;
+    }
+
+    rowData.push({ game, start, end, outcome, opponent, durSec, gameUrl, rowIndex });
   });
+
+  const rowsByIndex = new Map();
+  rowData.forEach(item => {
+    if (!rowsByIndex.has(item.rowIndex)) rowsByIndex.set(item.rowIndex, []);
+    rowsByIndex.get(item.rowIndex).push(item);
+  });
+
+  const packedRows = Array.from(rowsByIndex.entries()).sort(([a], [b]) => a - b).map(([, items]) => items);
+
+  function showTooltipAt({ start, end, durSec, outcome, opponent }, x, y) {
+    const startLocal = new Date(start * 1000).toLocaleString();
+    const endLocal   = new Date(end   * 1000).toLocaleString();
+    const durStr = fmtSeconds(durSec);
+    const outcomeLabel = outcome === "win" ? "Win ✅" : outcome === "loss" ? "Loss ❌" : outcome === "draw" ? "Draw 🤝" : "Unknown ❔";
+    tooltip.textContent = [
+      `vs ${opponent}`,
+      `Started: ${startLocal}`,
+      `Ended:   ${endLocal}`,
+      `Duration: ${durStr}`,
+      outcomeLabel,
+    ].join("\n");
+    tooltip.style.left = (x + 14) + "px";
+    tooltip.style.top  = (y + 14) + "px";
+    tooltip.style.display = "block";
+  }
 
   // ── Render function ────────────────────────────────────────────────────
   function render() {
@@ -219,14 +255,7 @@ function buildTimeline(games, username) {
     // ── Rows ────────────────────────────────────────────────────────────
     rowsEl.innerHTML = "";
 
-    rowData.forEach(({ game, start, end, outcome, opponent, durSec, gameUrl }) => {
-      const leftPct  = toPct(start);
-      const rightPct = toPct(end);
-      const widthPct = Math.max(0.3, rightPct - leftPct);
-
-      // Skip bars that are entirely outside the view
-      if (rightPct < -1 || leftPct > 101) return;
-
+    packedRows.forEach((items) => {
       const row = document.createElement("div");
       row.className = "timeline-row";
 
@@ -240,52 +269,45 @@ function buildTimeline(games, username) {
         row.appendChild(gl);
       }
 
-      const bar = document.createElement("a");
-      bar.className = `game-bar game-bar-${outcome}`;
-      bar.style.left = leftPct + "%";
-      bar.style.width = widthPct + "%";
+      items.forEach(({ game, start, end, outcome, opponent, durSec, gameUrl }) => {
+        const leftPct  = toPct(start);
+        const rightPct = toPct(end);
+        const widthPct = Math.max(0.3, rightPct - leftPct);
 
-      if (gameUrl) {
-        bar.href = gameUrl;
-        bar.target = "_blank";
-        bar.rel = "noopener noreferrer";
-      }
+        // Skip bars that are entirely outside the view
+        if (rightPct < -1 || leftPct > 101) return;
 
-      const barLabel = document.createElement("span");
-      barLabel.className = "game-bar-label";
-      barLabel.textContent = `vs ${opponent}`;
-      bar.appendChild(barLabel);
+        const bar = document.createElement("a");
+        bar.className = `game-bar game-bar-${outcome}`;
+        bar.style.left = leftPct + "%";
+        bar.style.width = widthPct + "%";
 
-      function showTooltipAt(x, y) {
-        const startLocal = new Date(start * 1000).toLocaleString();
-        const endLocal   = new Date(end   * 1000).toLocaleString();
-        const durStr = fmtSeconds(durSec);
-        const outcomeLabel = outcome === "win" ? "Win ✅" : outcome === "loss" ? "Loss ❌" : outcome === "draw" ? "Draw 🤝" : "Unknown ❔";
-        tooltip.textContent = [
-          `vs ${opponent}`,
-          `Started: ${startLocal}`,
-          `Ended:   ${endLocal}`,
-          `Duration: ${durStr}`,
-          outcomeLabel,
-        ].join("\n");
-        tooltip.style.left = (x + 14) + "px";
-        tooltip.style.top  = (y + 14) + "px";
-        tooltip.style.display = "block";
-      }
+        if (gameUrl) {
+          bar.href = gameUrl;
+          bar.target = "_blank";
+          bar.rel = "noopener noreferrer";
+        }
 
-      bar.addEventListener("mouseenter", e => showTooltipAt(e.clientX, e.clientY));
-      bar.addEventListener("mousemove",  e => {
-        tooltip.style.left = (e.clientX + 14) + "px";
-        tooltip.style.top  = (e.clientY + 14) + "px";
+        const barLabel = document.createElement("span");
+        barLabel.className = "game-bar-label";
+        barLabel.textContent = `vs ${opponent}`;
+        bar.appendChild(barLabel);
+
+        bar.addEventListener("mouseenter", e => showTooltipAt({ start, end, durSec, outcome, opponent }, e.clientX, e.clientY));
+        bar.addEventListener("mousemove",  e => {
+          tooltip.style.left = (e.clientX + 14) + "px";
+          tooltip.style.top  = (e.clientY + 14) + "px";
+        });
+        bar.addEventListener("focus", () => {
+          const r = bar.getBoundingClientRect();
+          showTooltipAt({ start, end, durSec, outcome, opponent }, r.right, r.top);
+        });
+        bar.addEventListener("blur",       () => { tooltip.style.display = "none"; });
+        bar.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+
+        row.appendChild(bar);
       });
-      bar.addEventListener("focus", () => {
-        const r = bar.getBoundingClientRect();
-        showTooltipAt(r.right, r.top);
-      });
-      bar.addEventListener("blur",       () => { tooltip.style.display = "none"; });
-      bar.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
 
-      row.appendChild(bar);
       rowsEl.appendChild(row);
     });
   }
