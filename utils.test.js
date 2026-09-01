@@ -6,6 +6,8 @@ const {
   computeDurations,
   durationToBarPercent,
   loadRecentGamesFromArchives,
+  getCurrentMonthArchiveUrl,
+  ensureCurrentMonthArchive,
   fmtSeconds,
   getCapturedPieces,
 } = require("./utils.js");
@@ -516,5 +518,169 @@ describe("loadRecentGamesFromArchives", () => {
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["m6", "m5", "m4", "m3"]);
     expect(archivesLoaded).toBe(4);
     expect(games).toHaveLength(4);
+  });
+
+  test("handles 404/error on new month gracefully and loads previous archives", async () => {
+    const archiveUrls = [
+      "https://api.chess.com/pub/player/kr_cz/games/2026/08",
+      "https://api.chess.com/pub/player/kr_cz/games/2026/09",
+    ];
+    const fetchMock = jest.fn(async (url) => {
+      if (url.endsWith("2026/09")) {
+        return {
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
+          json: async () => ({ message: "Archive not found" }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          games: [{ id: "august_1" }, { id: "august_2" }, { id: "august_3" }, { id: "august_4" }, { id: "august_5" }, { id: "august_6" }],
+        }),
+      };
+    });
+
+    const { games, archivesLoaded } = await loadRecentGamesFromArchives(fetchMock, archiveUrls, {
+      minGames: 6,
+      maxArchives: 4,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.chess.com/pub/player/kr_cz/games/2026/09");
+    expect(fetchMock.mock.calls[1][0]).toBe("https://api.chess.com/pub/player/kr_cz/games/2026/08");
+    expect(archivesLoaded).toBe(2);
+    expect(games).toHaveLength(6);
+    expect(games[0].id).toBe("august_1");
+  });
+
+  test("handles empty games list in new month and falls back to previous archives", async () => {
+    const archiveUrls = [
+      "https://api.chess.com/pub/player/kr_cz/games/2026/08",
+      "https://api.chess.com/pub/player/kr_cz/games/2026/09",
+    ];
+    const fetchMock = jest.fn(async (url) => {
+      if (url.endsWith("2026/09")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ games: [] }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          games: [{ id: "august_1" }, { id: "august_2" }, { id: "august_3" }, { id: "august_4" }, { id: "august_5" }, { id: "august_6" }],
+        }),
+      };
+    });
+
+    const { games, archivesLoaded } = await loadRecentGamesFromArchives(fetchMock, archiveUrls, {
+      minGames: 6,
+      maxArchives: 4,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(archivesLoaded).toBe(2);
+    expect(games).toHaveLength(6);
+  });
+
+  test("handles network exception gracefully and continues to previous archives", async () => {
+    const archiveUrls = [
+      "https://api.chess.com/pub/player/kr_cz/games/2026/08",
+      "https://api.chess.com/pub/player/kr_cz/games/2026/09",
+    ];
+    const fetchMock = jest.fn(async (url) => {
+      if (url.endsWith("2026/09")) {
+        throw new Error("Network error");
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          games: [{ id: "august_1" }, { id: "august_2" }, { id: "august_3" }, { id: "august_4" }, { id: "august_5" }, { id: "august_6" }],
+        }),
+      };
+    });
+
+    const { games, archivesLoaded } = await loadRecentGamesFromArchives(fetchMock, archiveUrls, {
+      minGames: 6,
+      maxArchives: 4,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(archivesLoaded).toBe(2);
+    expect(games).toHaveLength(6);
+  });
+});
+
+describe("getCurrentMonthArchiveUrl", () => {
+  test("generates expected URL with username and UTC date", () => {
+    const date = new Date("2026-09-01T18:34:16.356Z");
+    expect(getCurrentMonthArchiveUrl("kr_cz", date)).toBe(
+      "https://api.chess.com/pub/player/kr_cz/games/2026/09"
+    );
+  });
+
+  test("normalizes username by trimming and lowercasing", () => {
+    const date = new Date("2026-01-15T00:00:00Z");
+    expect(getCurrentMonthArchiveUrl("  KR_CZ  ", date)).toBe(
+      "https://api.chess.com/pub/player/kr_cz/games/2026/01"
+    );
+  });
+
+  test("returns null if username is missing", () => {
+    expect(getCurrentMonthArchiveUrl("", new Date())).toBeNull();
+    expect(getCurrentMonthArchiveUrl(null, new Date())).toBeNull();
+  });
+});
+
+describe("ensureCurrentMonthArchive", () => {
+  test("appends current month when it is missing from archives", () => {
+    const archives = [
+      "https://api.chess.com/pub/player/kr_cz/games/2026/07",
+      "https://api.chess.com/pub/player/kr_cz/games/2026/08",
+    ];
+    const date = new Date("2026-09-01T18:34:16.356Z");
+    const result = ensureCurrentMonthArchive(archives, "kr_cz", date);
+
+    expect(result).toEqual([
+      "https://api.chess.com/pub/player/kr_cz/games/2026/07",
+      "https://api.chess.com/pub/player/kr_cz/games/2026/08",
+      "https://api.chess.com/pub/player/kr_cz/games/2026/09",
+    ]);
+  });
+
+  test("does not add duplicate when current month is already in archives", () => {
+    const archives = [
+      "https://api.chess.com/pub/player/kr_cz/games/2026/08",
+      "https://api.chess.com/pub/player/kr_cz/games/2026/09",
+    ];
+    const date = new Date("2026-09-01T18:34:16.356Z");
+    const result = ensureCurrentMonthArchive(archives, "kr_cz", date);
+
+    expect(result).toEqual([
+      "https://api.chess.com/pub/player/kr_cz/games/2026/08",
+      "https://api.chess.com/pub/player/kr_cz/games/2026/09",
+    ]);
+  });
+
+  test("works when archives array is empty", () => {
+    const date = new Date("2026-09-01T00:00:00Z");
+    const result = ensureCurrentMonthArchive([], "kr_cz", date);
+    expect(result).toEqual(["https://api.chess.com/pub/player/kr_cz/games/2026/09"]);
+  });
+
+  test("infers base URL from existing archive when username is not supplied", () => {
+    const archives = ["https://api.chess.com/pub/player/kr_cz/games/2026/08"];
+    const date = new Date("2026-09-01T00:00:00Z");
+    const result = ensureCurrentMonthArchive(archives, "", date);
+    expect(result).toEqual([
+      "https://api.chess.com/pub/player/kr_cz/games/2026/08",
+      "https://api.chess.com/pub/player/kr_cz/games/2026/09",
+    ]);
   });
 });
