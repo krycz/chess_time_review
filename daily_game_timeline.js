@@ -495,9 +495,8 @@ async function loadAdditionalMonth() {
     const monthData = await res.json();
     const monthGames = monthData && Array.isArray(monthData.games) ? monthData.games : [];
 
-    // The newly loaded archive is older than everything already in
-    // sessionGames, so prepend it to keep chronological (oldest->newest) order.
-    sessionGames = monthGames.concat(sessionGames);
+    // Merge newly loaded games into the current session; buildTimeline sorts by end time.
+    sessionGames = sessionGames.concat(monthGames);
     sessionArchivesLoaded++;
 
     updateStatusText(sessionArchivesLoaded);
