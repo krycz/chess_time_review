@@ -291,8 +291,7 @@ function getCurrentMonthArchiveUrl(username, date) {
 // Check if an archive list already contains an archive for the specified year and month.
 function hasArchiveForMonth(archiveUrls, year, month) {
   const monthStr = String(month).padStart(2, "0");
-  const monthNum = parseInt(monthStr, 10);
-  const pattern = new RegExp(`/${year}/(?:${monthStr}|${monthNum})(?:/)?$`, "i");
+  const pattern = new RegExp(`/${year}/${monthStr}(?:/)?$`, "i");
   return (archiveUrls || []).some((url) => typeof url === "string" && pattern.test(url.trim()));
 }
 
@@ -351,8 +350,6 @@ async function loadRecentGamesFromArchives(fetchImpl, archiveUrls, opts) {
       if (archiveRes && archiveRes.ok) {
         const monthData = await archiveRes.json();
         monthGames = monthData && Array.isArray(monthData.games) ? monthData.games : [];
-      } else {
-        monthGames = [];
       }
     } catch (err) {
       monthGames = [];
