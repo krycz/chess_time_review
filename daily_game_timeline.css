@@ -1,4 +1,8 @@
 /* Timeline-specific styles */
+#loadMoreBtn {
+  align-self: flex-start;
+}
+
 .timeline-container {
   margin-top: 16px;
 }

@@ -279,10 +279,12 @@ function durationToBarPercent(duration, maxDuration, opts) {
 
 // Load recent monthly archives newest-first and return enough games for the UI.
 // `archiveUrls` is expected oldest->newest (chess.com archives API order).
-// Stops once minGames is reached or maxArchives have been fetched.
+// Stops once minGames is reached (and at least minArchives have been fetched)
+// or maxArchives have been fetched.
 async function loadRecentGamesFromArchives(fetchImpl, archiveUrls, opts) {
   const options = opts || {};
   const minGames = Number.isFinite(options.minGames) ? options.minGames : 6;
+  const minArchives = Number.isFinite(options.minArchives) ? options.minArchives : 0;
   const maxArchives = Number.isFinite(options.maxArchives) ? options.maxArchives : 4;
   const onArchiveLoadStart = typeof options.onArchiveLoadStart === "function"
     ? options.onArchiveLoadStart
@@ -304,7 +306,7 @@ async function loadRecentGamesFromArchives(fetchImpl, archiveUrls, opts) {
     const monthGames = monthData && Array.isArray(monthData.games) ? monthData.games : [];
     games.push(...monthGames);
     archivesLoaded++;
-    if (games.length >= minGames) break;
+    if (games.length >= minGames && archivesLoaded >= minArchives) break;
   }
 
   return { games, archivesLoaded };
