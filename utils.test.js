@@ -21,6 +21,7 @@ describe("getGameResultMethod", () => {
     expect(getGameResultMethod("win", "checkmated", "win")).toBe("Won by checkmate");
     expect(getGameResultMethod("win", "resigned", "win")).toBe("Won by resignation");
     expect(getGameResultMethod("win", "timeout", "win")).toBe("Won on time");
+    expect(getGameResultMethod("win", "abandoned", "win")).toBe("Won by abandonment");
   });
 
   test("marks losses by the same causes", () => {
