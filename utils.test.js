@@ -11,11 +11,9 @@ const {
   fmtSeconds,
   getCapturedPieces,
   isBotGame,
+  getGameResultMethod,
 } = require("./utils.js");
 
-// ---------------------------------------------------------------------------
-// parseClockToSeconds
-// ---------------------------------------------------------------------------
 describe("isBotGame", () => {
   test("recognizes games against a coach from the PGN event", () => {
     expect(isBotGame({
@@ -41,6 +39,28 @@ describe("isBotGame", () => {
   });
 });
 
+describe("getGameResultMethod", () => {
+  test("marks wins by checkmate, resignation, and timeout", () => {
+    expect(getGameResultMethod("win", "checkmated", "win")).toBe("Won by checkmate");
+    expect(getGameResultMethod("win", "resigned", "win")).toBe("Won by resignation");
+    expect(getGameResultMethod("win", "timeout", "win")).toBe("Won on time");
+    expect(getGameResultMethod("win", "abandoned", "win")).toBe("Won by abandonment");
+  });
+
+  test("marks losses by the same causes", () => {
+    expect(getGameResultMethod("checkmated", "win", "loss")).toBe("Lost by checkmate");
+    expect(getGameResultMethod("resigned", "win", "loss")).toBe("Lost by resignation");
+    expect(getGameResultMethod("timeout", "win", "loss")).toBe("Lost on time");
+  });
+
+  test("returns null for draws", () => {
+    expect(getGameResultMethod("agreed", "agreed", "draw")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseClockToSeconds
+// ---------------------------------------------------------------------------
 describe("parseClockToSeconds", () => {
   test("H:MM:SS format", () => {
     expect(parseClockToSeconds("0:15:00")).toBe(900);
