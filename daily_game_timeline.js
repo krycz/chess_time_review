@@ -58,8 +58,8 @@ function getGameUrl(game) {
 // ── Gantt rendering ──────────────────────────────────────────────────────
 
 function buildTimeline(games, username) {
-  // Only daily games
-  const daily = games.filter(g => g.time_class === "daily");
+  // Only daily games between human players.
+  const daily = games.filter(g => g.time_class === "daily" && !isBotGame(g));
   const chart = el("timelineChart");
   const emptyMsg = el("timeline-empty");
 
