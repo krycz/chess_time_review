@@ -55,6 +55,65 @@ function getGameUrl(game) {
   return (m && m[1]) || game.url || null;
 }
 
+// Compute the move-progress curve for a *daily* game: an array of [timeFraction,
+// moveFraction] points (each in [0, 1]) where moveFraction tracks completed
+// half-moves (plies) as a fraction of total half-moves, over the game's elapsed time.
+// per-move durations derived from PGN %clk annotations (daily-game heuristic:
+// %clk * 10 = move duration — see computeDurations in utils.js). Only valid for
+// daily games; buildTimeline only calls this for games with time_class "daily".
+// Returns null when there isn't enough reliable data (no PGN, no moves, no
+// usable durations, or too many moves are missing duration data).
+function getDailyMoveProgressPoints(game) {
+  const pgn = game.pgn || "";
+  if (!pgn) return null;
+  const parsedMoves = parseMovesWithClocks(pgn);
+  const totalMoves = parsedMoves.reduce((n, m) => n + (m.white && m.white.san ? 1 : 0) + (m.black && m.black.san ? 1 : 0), 0);
+  if (totalMoves === 0) return null;
+
+  const timeControl = getPgnTag(pgn, "TimeControl") || game.time_control || null;
+  const { initial, increment } = parseTimeControl(timeControl);
+  const flatMoves = computeDurations(parsedMoves, initial, increment, { isDaily: true });
+  if (flatMoves.length === 0) return null;
+
+  // If too many moves are missing usable duration data, the resulting curve
+  // would contain misleading flat segments rather than reflecting real timing,
+  // so skip the overlay entirely in that case.
+  const missingCount = flatMoves.filter(m => !Number.isFinite(m.duration)).length;
+  if (missingCount / flatMoves.length > 0.2) return null;
+
+  const durations = flatMoves.map(m => (Number.isFinite(m.duration) ? Math.max(0, m.duration) : 0));
+  const totalDuration = durations.reduce((a, b) => a + b, 0);
+  if (totalDuration <= 0) return null;
+
+  const points = [[0, 0]];
+  let cumDur = 0;
+  durations.forEach((d, i) => {
+    cumDur += d;
+    points.push([cumDur / totalDuration, (i + 1) / flatMoves.length]);
+  });
+  return points;
+}
+
+// Build the SVG overlay element showing move progress over time for a game bar.
+function buildProgressOverlay(points) {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "game-bar-progress");
+  svg.setAttribute("viewBox", "0 0 100 100");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("focusable", "false");
+  svg.setAttribute("aria-hidden", "true");
+
+  const polyline = document.createElementNS(svgNS, "polyline");
+  const ptsStr = points
+    .map(([tFrac, moveFrac]) => `${(tFrac * 100).toFixed(2)},${(100 - moveFrac * 100).toFixed(2)}`)
+    .join(" ");
+  polyline.setAttribute("points", ptsStr);
+  polyline.setAttribute("class", "game-bar-progress-line");
+  svg.appendChild(polyline);
+  return svg;
+}
+
 // ── Gantt rendering ──────────────────────────────────────────────────────
 
 function buildTimeline(games, username) {
@@ -165,6 +224,7 @@ function buildTimeline(games, username) {
     );
     const durSec = end - start;
     const gameUrl = getGameUrl(game);
+    const progressPoints = getDailyMoveProgressPoints(game);
 
     let rowIndex = rowEndTimes.findIndex(rowEnd => rowEnd <= start);
     if (rowIndex === -1) {
@@ -182,7 +242,7 @@ function buildTimeline(games, username) {
     const myResult = (mySide && mySide.result) || "";
     const oppResult = (oppSide && oppSide.result) || "";
 
-    rowData.push({ game, start, end, outcome, opponent, durSec, gameUrl, rowIndex, myResult, oppResult });
+    rowData.push({ game, start, end, outcome, opponent, durSec, gameUrl, progressPoints, rowIndex, myResult, oppResult });
   });
 
   const rowsByIndex = new Map();
@@ -294,7 +354,7 @@ function buildTimeline(games, username) {
         row.appendChild(gl);
       }
 
-      items.forEach(({ game, start, end, outcome, opponent, durSec, gameUrl, myResult, oppResult }) => {
+      items.forEach(({ game, start, end, outcome, opponent, durSec, gameUrl, progressPoints, myResult, oppResult }) => {
         const leftPct  = toPct(start);
         const rightPct = toPct(end);
         const widthPct = Math.max(0.3, rightPct - leftPct);
@@ -311,6 +371,10 @@ function buildTimeline(games, username) {
           bar.href = gameUrl;
           bar.target = "_blank";
           bar.rel = "noopener noreferrer";
+        }
+
+        if (progressPoints && progressPoints.length > 1) {
+          bar.appendChild(buildProgressOverlay(progressPoints));
         }
 
         const barLabel = document.createElement("span");

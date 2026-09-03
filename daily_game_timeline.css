@@ -137,6 +137,23 @@
   pointer-events: none;
 }
 
+/* per-game move-progress overlay: shows % of moves completed over time */
+.game-bar-progress {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.game-bar-progress-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
 /* outcome colours */
 .game-bar-win  { background: #3aaa5e; }
 .game-bar-loss { background: #d94040; }
