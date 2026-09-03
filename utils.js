@@ -83,6 +83,17 @@ function getPgnTag(pgn, tag) {
   return m ? m[1] : null;
 }
 
+function isBotGame(game) {
+  const players = [game && game.white, game && game.black];
+  if (players.some(player =>
+    player && typeof player === "object" && String(player.title || "").toUpperCase() === "BOT"
+  )) {
+    return true;
+  }
+  const event = getPgnTag((game && game.pgn) || "", "Event") || "";
+  return /^Play vs (?:Coach|Computer|Bot)\b/i.test(event);
+}
+
 // Build a short, human-friendly label (with emoji) describing a game's time class
 // and time control, e.g. "⚡ Blitz 5+0", "⏱️ Rapid 15+10", "📅 Daily 3d/move", "🚀 Bullet 1+0".
 // This lets users distinguish games that share a time_class (e.g. chess.com groups
@@ -465,6 +476,7 @@ if (typeof module !== "undefined" && module.exports) {
     parseClockToSeconds,
     parseTimeControl,
     getPgnTag,
+    isBotGame,
     getGameTypeLabel,
     parseMovesWithClocks,
     computeDurations,

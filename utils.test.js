@@ -10,11 +10,37 @@ const {
   ensureCurrentMonthArchive,
   fmtSeconds,
   getCapturedPieces,
+  isBotGame,
 } = require("./utils.js");
 
 // ---------------------------------------------------------------------------
 // parseClockToSeconds
 // ---------------------------------------------------------------------------
+describe("isBotGame", () => {
+  test("recognizes games against a coach from the PGN event", () => {
+    expect(isBotGame({
+      pgn: '[Event "Play vs Coach"]',
+      white: { username: "kr_cz" },
+      black: { username: "Coach-Magnus" },
+    })).toBe(true);
+  });
+
+  test("recognizes a player explicitly titled BOT", () => {
+    expect(isBotGame({
+      white: { username: "kr_cz" },
+      black: { username: "computer", title: "BOT" },
+    })).toBe(true);
+  });
+
+  test("does not exclude ordinary games", () => {
+    expect(isBotGame({
+      pgn: '[Event "Daily Chess"]',
+      white: { username: "kr_cz" },
+      black: { username: "friend" },
+    })).toBe(false);
+  });
+});
+
 describe("parseClockToSeconds", () => {
   test("H:MM:SS format", () => {
     expect(parseClockToSeconds("0:15:00")).toBe(900);

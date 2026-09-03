@@ -32,12 +32,6 @@ function getGamePlayerName(player, fallback) {
   return player.username || fallback;
 }
 
-function isBotGame(game) {
-  return [game.white, game.black].some(player =>
-    player && typeof player === "object" && String(player.title || "").toUpperCase() === "BOT"
-  );
-}
-
 function getOutcomeClass(game, username) {
   const white = getGamePlayerName(game.white, "").toLowerCase();
   const uname = (username || "").trim().toLowerCase();
