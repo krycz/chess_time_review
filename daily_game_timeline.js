@@ -56,8 +56,8 @@ function getGameUrl(game) {
 }
 
 // Compute the move-progress curve for a *daily* game: an array of [timeFraction,
-// moveFraction] points (each in [0, 1]) describing what percentage of the game's
-// moves had been completed at what percentage of its elapsed time. Uses the
+// moveFraction] points (each in [0, 1]) where moveFraction tracks completed
+// half-moves (plies) as a fraction of total half-moves, over the game's elapsed time.
 // per-move durations derived from PGN %clk annotations (daily-game heuristic:
 // %clk * 10 = move duration — see computeDurations in utils.js). Only valid for
 // daily games; buildTimeline only calls this for games with time_class "daily".
