@@ -114,6 +114,27 @@ function getGameTypeLabel(game) {
   }
 }
 
+// Describe how a game was won or lost for a player.
+// Examples: "Won by checkmate", "Lost on time", "Won by resignation".
+function getGameResultMethod(myResult, oppResult, outcome) {
+  const lossReasons = new Set(["checkmated", "resigned", "timeout", "lose", "abandoned"]);
+  const resultMethods = {
+    checkmated: "by checkmate",
+    resigned: "by resignation",
+    timeout: "on time",
+    abandoned: "by abandonment",
+  };
+
+  const isWin = outcome === "win" || myResult === "win" || lossReasons.has(oppResult);
+  const isLoss = outcome === "loss" || lossReasons.has(myResult) || oppResult === "win";
+
+  if (!isWin && !isLoss) return null;
+
+  const cause = resultMethods[oppResult] || resultMethods[myResult];
+  const verb = isWin ? "Won" : "Lost";
+  return cause ? `${verb} ${cause}` : (isWin ? "Won" : "Lost");
+}
+
 // Parse moves and clocks from PGN into an array of {moveNumber, white: {san, clk}, black: {san, clk}}
 function parseMovesWithClocks(pgn) {
   // Split off tag block
@@ -466,6 +487,7 @@ if (typeof module !== "undefined" && module.exports) {
     parseTimeControl,
     getPgnTag,
     getGameTypeLabel,
+    getGameResultMethod,
     parseMovesWithClocks,
     computeDurations,
     durationToBarPercent,
