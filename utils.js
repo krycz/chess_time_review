@@ -132,7 +132,7 @@ function getGameResultMethod(myResult, oppResult, outcome) {
 
   const cause = resultMethods[oppResult] || resultMethods[myResult];
   const verb = isWin ? "Won" : "Lost";
-  return cause ? `${verb} ${cause}` : (isWin ? "Won" : "Lost");
+  return cause ? `${verb} ${cause}` : null;
 }
 
 // Parse moves and clocks from PGN into an array of {moveNumber, white: {san, clk}, black: {san, clk}}
