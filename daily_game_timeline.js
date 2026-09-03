@@ -174,10 +174,11 @@ function buildTimeline(games, username) {
       rowEndTimes[rowIndex] = end;
     }
 
-    const mySide = (username || "").trim().toLowerCase() === getGamePlayerName(game.white, "").toLowerCase()
-      ? game.white : game.black;
-    const oppSide = (username || "").trim().toLowerCase() === getGamePlayerName(game.white, "").toLowerCase()
-      ? game.black : game.white;
+    const uname = (username || "").trim().toLowerCase();
+    const whiteName = getGamePlayerName(game.white, "").toLowerCase();
+    const isUserWhite = uname === whiteName;
+    const mySide = isUserWhite ? game.white : game.black;
+    const oppSide = isUserWhite ? game.black : game.white;
     const myResult = (mySide && mySide.result) || "";
     const oppResult = (oppSide && oppSide.result) || "";
 
