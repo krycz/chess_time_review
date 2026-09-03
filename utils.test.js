@@ -10,7 +10,53 @@ const {
   ensureCurrentMonthArchive,
   fmtSeconds,
   getCapturedPieces,
+  isBotGame,
+  getGameResultMethod,
 } = require("./utils.js");
+
+describe("isBotGame", () => {
+  test("recognizes games against a coach from the PGN event", () => {
+    expect(isBotGame({
+      pgn: '[Event "Play vs Coach"]',
+      white: { username: "kr_cz" },
+      black: { username: "Coach-Magnus" },
+    })).toBe(true);
+  });
+
+  test("recognizes a player explicitly titled BOT", () => {
+    expect(isBotGame({
+      white: { username: "kr_cz" },
+      black: { username: "computer", title: "BOT" },
+    })).toBe(true);
+  });
+
+  test("does not exclude ordinary games", () => {
+    expect(isBotGame({
+      pgn: '[Event "Daily Chess"]',
+      white: { username: "kr_cz" },
+      black: { username: "friend" },
+    })).toBe(false);
+  });
+});
+
+describe("getGameResultMethod", () => {
+  test("marks wins by checkmate, resignation, and timeout", () => {
+    expect(getGameResultMethod("win", "checkmated", "win")).toBe("Won by checkmate");
+    expect(getGameResultMethod("win", "resigned", "win")).toBe("Won by resignation");
+    expect(getGameResultMethod("win", "timeout", "win")).toBe("Won on time");
+    expect(getGameResultMethod("win", "abandoned", "win")).toBe("Won by abandonment");
+  });
+
+  test("marks losses by the same causes", () => {
+    expect(getGameResultMethod("checkmated", "win", "loss")).toBe("Lost by checkmate");
+    expect(getGameResultMethod("resigned", "win", "loss")).toBe("Lost by resignation");
+    expect(getGameResultMethod("timeout", "win", "loss")).toBe("Lost on time");
+  });
+
+  test("returns null for draws", () => {
+    expect(getGameResultMethod("agreed", "agreed", "draw")).toBeNull();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // parseClockToSeconds

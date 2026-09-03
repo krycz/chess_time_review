@@ -83,6 +83,17 @@ function getPgnTag(pgn, tag) {
   return m ? m[1] : null;
 }
 
+function isBotGame(game) {
+  const players = [game && game.white, game && game.black];
+  if (players.some(player =>
+    player && typeof player === "object" && String(player.title || "").toUpperCase() === "BOT"
+  )) {
+    return true;
+  }
+  const event = getPgnTag((game && game.pgn) || "", "Event") || "";
+  return /^Play vs (?:Coach|Computer|Bot)\b/i.test(event);
+}
+
 // Build a short, human-friendly label (with emoji) describing a game's time class
 // and time control, e.g. "⚡ Blitz 5+0", "⏱️ Rapid 15+10", "📅 Daily 3d/move", "🚀 Bullet 1+0".
 // This lets users distinguish games that share a time_class (e.g. chess.com groups
@@ -112,6 +123,27 @@ function getGameTypeLabel(game) {
     const minStr = Number.isInteger(minutes) ? minutes : minutes.toFixed(1);
     return `${emoji} ${minStr}+${increment}`;
   }
+}
+
+// Describe how a game was won or lost for a player.
+// Examples: "Won by checkmate", "Lost on time", "Won by resignation".
+function getGameResultMethod(myResult, oppResult, outcome) {
+  const lossReasons = new Set(["checkmated", "resigned", "timeout", "lose", "abandoned"]);
+  const resultMethods = {
+    checkmated: "by checkmate",
+    resigned: "by resignation",
+    timeout: "on time",
+    abandoned: "by abandonment",
+  };
+
+  const isWin = outcome === "win" || myResult === "win" || lossReasons.has(oppResult);
+  const isLoss = outcome === "loss" || lossReasons.has(myResult) || oppResult === "win";
+
+  if (!isWin && !isLoss) return null;
+
+  const cause = resultMethods[oppResult] || resultMethods[myResult];
+  const verb = isWin ? "Won" : "Lost";
+  return cause ? `${verb} ${cause}` : null;
 }
 
 // Parse moves and clocks from PGN into an array of {moveNumber, white: {san, clk}, black: {san, clk}}
@@ -465,7 +497,9 @@ if (typeof module !== "undefined" && module.exports) {
     parseClockToSeconds,
     parseTimeControl,
     getPgnTag,
+    isBotGame,
     getGameTypeLabel,
+    getGameResultMethod,
     parseMovesWithClocks,
     computeDurations,
     durationToBarPercent,

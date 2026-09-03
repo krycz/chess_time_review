@@ -117,8 +117,8 @@ function buildProgressOverlay(points) {
 // ── Gantt rendering ──────────────────────────────────────────────────────
 
 function buildTimeline(games, username) {
-  // Only daily games
-  const daily = games.filter(g => g.time_class === "daily");
+  // Only daily games between human players.
+  const daily = games.filter(g => g.time_class === "daily" && !isBotGame(g));
   const chart = el("timelineChart");
   const emptyMsg = el("timeline-empty");
 
@@ -234,7 +234,15 @@ function buildTimeline(games, username) {
       rowEndTimes[rowIndex] = end;
     }
 
-    rowData.push({ game, start, end, outcome, opponent, durSec, gameUrl, progressPoints, rowIndex });
+    const uname = (username || "").trim().toLowerCase();
+    const whiteName = getGamePlayerName(game.white, "").toLowerCase();
+    const isUserWhite = uname === whiteName;
+    const mySide = isUserWhite ? game.white : game.black;
+    const oppSide = isUserWhite ? game.black : game.white;
+    const myResult = (mySide && mySide.result) || "";
+    const oppResult = (oppSide && oppSide.result) || "";
+
+    rowData.push({ game, start, end, outcome, opponent, durSec, gameUrl, progressPoints, rowIndex, myResult, oppResult });
   });
 
   const rowsByIndex = new Map();
@@ -245,18 +253,20 @@ function buildTimeline(games, username) {
 
   const packedRows = Array.from(rowsByIndex.entries()).sort(([a], [b]) => a - b).map(([, items]) => items);
 
-  function showTooltipAt({ start, end, durSec, outcome, opponent }, x, y) {
+  function showTooltipAt({ start, end, durSec, outcome, opponent, myResult, oppResult }, x, y) {
     const startLocal = new Date(start * 1000).toLocaleString();
     const endLocal   = new Date(end   * 1000).toLocaleString();
     const durStr = fmtSeconds(durSec);
     const outcomeLabel = outcome === "win" ? "Win ✅" : outcome === "loss" ? "Loss ❌" : outcome === "draw" ? "Draw 🤝" : "Unknown ❔";
+    const resultMethod = getGameResultMethod(myResult, oppResult, outcome);
     tooltip.textContent = [
       `vs ${opponent}`,
       `Started: ${startLocal}`,
       `Ended:   ${endLocal}`,
       `Duration: ${durStr}`,
       outcomeLabel,
-    ].join("\n");
+      resultMethod,
+    ].filter(Boolean).join("\n");
     tooltip.style.left = (x + 14) + "px";
     tooltip.style.top  = (y + 14) + "px";
     tooltip.style.display = "block";
@@ -344,7 +354,7 @@ function buildTimeline(games, username) {
         row.appendChild(gl);
       }
 
-      items.forEach(({ game, start, end, outcome, opponent, durSec, gameUrl, progressPoints }) => {
+      items.forEach(({ game, start, end, outcome, opponent, durSec, gameUrl, progressPoints, myResult, oppResult }) => {
         const leftPct  = toPct(start);
         const rightPct = toPct(end);
         const widthPct = Math.max(0.3, rightPct - leftPct);
@@ -372,14 +382,14 @@ function buildTimeline(games, username) {
         barLabel.textContent = `vs ${opponent}`;
         bar.appendChild(barLabel);
 
-        bar.addEventListener("mouseenter", e => showTooltipAt({ start, end, durSec, outcome, opponent }, e.clientX, e.clientY));
+        bar.addEventListener("mouseenter", e => showTooltipAt({ start, end, durSec, outcome, opponent, myResult, oppResult }, e.clientX, e.clientY));
         bar.addEventListener("mousemove",  e => {
           tooltip.style.left = (e.clientX + 14) + "px";
           tooltip.style.top  = (e.clientY + 14) + "px";
         });
         bar.addEventListener("focus", () => {
           const r = bar.getBoundingClientRect();
-          showTooltipAt({ start, end, durSec, outcome, opponent }, r.right, r.top);
+          showTooltipAt({ start, end, durSec, outcome, opponent, myResult, oppResult }, r.right, r.top);
         });
         bar.addEventListener("blur",       () => { tooltip.style.display = "none"; });
         bar.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
