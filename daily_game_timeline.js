@@ -294,7 +294,7 @@ function buildTimeline(games, username) {
         row.appendChild(gl);
       }
 
-      items.forEach(({ game, start, end, outcome, opponent, durSec, gameUrl }) => {
+      items.forEach(({ game, start, end, outcome, opponent, durSec, gameUrl, myResult, oppResult }) => {
         const leftPct  = toPct(start);
         const rightPct = toPct(end);
         const widthPct = Math.max(0.3, rightPct - leftPct);
