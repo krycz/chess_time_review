@@ -317,14 +317,14 @@ function buildTimeline(games, username) {
         barLabel.textContent = `vs ${opponent}`;
         bar.appendChild(barLabel);
 
-        bar.addEventListener("mouseenter", e => showTooltipAt({ start, end, durSec, outcome, opponent }, e.clientX, e.clientY));
+        bar.addEventListener("mouseenter", e => showTooltipAt({ start, end, durSec, outcome, opponent, myResult, oppResult }, e.clientX, e.clientY));
         bar.addEventListener("mousemove",  e => {
           tooltip.style.left = (e.clientX + 14) + "px";
           tooltip.style.top  = (e.clientY + 14) + "px";
         });
         bar.addEventListener("focus", () => {
           const r = bar.getBoundingClientRect();
-          showTooltipAt({ start, end, durSec, outcome, opponent }, r.right, r.top);
+          showTooltipAt({ start, end, durSec, outcome, opponent, myResult, oppResult }, r.right, r.top);
         });
         bar.addEventListener("blur",       () => { tooltip.style.display = "none"; });
         bar.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
